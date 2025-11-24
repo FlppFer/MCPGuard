@@ -1,0 +1,2 @@
+scope: "production"
+log-level: "error"
