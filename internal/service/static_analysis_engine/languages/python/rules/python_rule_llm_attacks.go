@@ -138,8 +138,8 @@ var llmAttackPatterns = []struct {
 		attackType:  "HALLUCINATION",
 	},
 	{
-		pattern:     regexp.MustCompile(`(?i)(real-?time|live|current)\s+(data|price|stock|weather).*(?!api|fetch|request)`),
-		description: "Claim of real-time data without API - hallucination risk",
+		pattern:     regexp.MustCompile(`(?i)(real-?time|live|current)\s+(data|price|stock|weather)`),
+		description: "Claim of real-time data - verify API source exists",
 		severity:    static_analysis_engine.SeverityMedium,
 		attackType:  "HALLUCINATION",
 	},

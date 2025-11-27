@@ -127,8 +127,8 @@ var multiToolPatterns = []struct {
 		attackType:  "FUNCTIONAL-OBFUSCATION",
 	},
 	{
-		pattern:     regexp.MustCompile(`(?i)(delete|remove|erase).*file.*(?!confirm|warning|prompt)`),
-		description: "Destructive action without confirmation - obfuscation",
+		pattern:     regexp.MustCompile(`(?i)(delete|remove|erase).*file`),
+		description: "Destructive file action - verify confirmation exists",
 		severity:    static_analysis_engine.SeverityHigh,
 		attackType:  "FUNCTIONAL-OBFUSCATION",
 	},

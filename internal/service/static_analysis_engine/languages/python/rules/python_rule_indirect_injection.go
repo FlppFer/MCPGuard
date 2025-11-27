@@ -156,8 +156,8 @@ var indirectInjectionPatterns = []struct {
 		attackID:    "DESERIALIZATION",
 	},
 	{
-		pattern:     regexp.MustCompile(`(?i)yaml\.load\s*\([^)]*\)(?!.*Loader)`),
-		description: "Unsafe YAML load without Loader specification",
+		pattern:     regexp.MustCompile(`(?i)yaml\.load\s*\([^)]*\)`),
+		description: "YAML load - verify Loader is specified for safety",
 		severity:    static_analysis_engine.SeverityHigh,
 		attackID:    "DESERIALIZATION",
 	},
