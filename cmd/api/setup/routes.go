@@ -16,7 +16,8 @@ func InitRoutes(resources *Resources) {
 
 	// Git webhook entrypoint exposes StartAnalysis(w, r) so we can use it directly as an http.HandlerFunc
 	r.Route("/v1", func(r chi.Router) {
-		r.Post("/security_analysis", resources.GitWebhookEntrypoint.StartAnalysis())
+		r.Post("/security_analysis", resources.GitWebhookController.StartAnalysis())
+		r.Get("/security_analysis/{id}", resources.GitWebhookController.GetAnalysisStatus())
 		r.Post("/agentic_analysis", resources.AgenticAnalysisController.RequestAgenticAnalysis())
 	})
 

@@ -59,7 +59,7 @@ func (uc *gitWebhookServiceImpl) RequestAnalysis(
 	}
 
 	// 2. Download repository locally
-	repo, err := utils.DownloadRepo(repoURL, commit)
+	repo, err := utils.DownloadRepo(repoURL, branch, commit)
 	if err != nil {
 		entity.Status = "clone_failed"
 		entity.ErrorMessage = err.Error()
@@ -72,7 +72,7 @@ func (uc *gitWebhookServiceImpl) RequestAnalysis(
 	uc.dbRepo.Update(ctx, entity)
 
 	// 3. Upload ZIP to object obj_storage
-	err = uc.storageRepo.Upload(ctx, analysisID+".zip", repo.ZipPath)
+	err = uc.storageRepo.UploadFile(ctx, analysisID+".zip", repo.ZipPath)
 	if err != nil {
 		entity.Status = "storage_upload_failed"
 		entity.ErrorMessage = err.Error()

@@ -1,7 +1,8 @@
-package api
+package main
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
 
 	"github.com/FlppFer/MCPGuard/cmd/api/setup"
@@ -24,8 +25,9 @@ func run(ctx context.Context) error {
 		panic(err)
 	}
 
-	resources, err :=
+	resources := setup.Bootstrap(ctx, cfg)
 
-	//resources, err := setup
-		setup.InitRoutes()
+	fmt.Println("MCPGuard - Initializing server")
+	setup.InitRoutes(resources)
+	return nil
 }

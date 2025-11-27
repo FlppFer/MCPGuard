@@ -24,7 +24,7 @@ func Bootstrap(ctx context.Context, cfg *config.Config) *Resources {
 		panic(err)
 	}
 
-	osClient, err := obj_storage.NewObjectStorageClient(cfg.ObjectStorageCfg.Mock, cfg.ObjectStorageCfg.BasePath)
+	osClient, err := obj_storage.NewObjectStorageClient(cfg.ObjectStorageCfg)
 	if err != nil {
 		panic(err)
 	}
@@ -34,6 +34,6 @@ func Bootstrap(ctx context.Context, cfg *config.Config) *Resources {
 	gitWebhookService := service.NewGitWebhookService(dbClient, osClient, staticAnalyzerEngine)
 	return &Resources{
 		GitWebhookController:      controller.NewGitWebhookController(gitWebhookService),
-		AgenticAnalysisController: nil,
+		AgenticAnalysisController: controller.NewAgenticAnalysisController(),
 	}
 }

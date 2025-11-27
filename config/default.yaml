@@ -1,2 +1,9 @@
 scope: "default"
 log-level: "debug"
+
+data_base:
+  mock: true
+
+object_storage:
+  mock: true
+  base-path: "./storage"

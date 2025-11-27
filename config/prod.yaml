@@ -1,2 +1,15 @@
 scope: "production"
 log-level: "error"
+
+data_base:
+  mock: false
+  path: "./data/mcpguard.db"
+
+object_storage:
+  mock: false
+  base-path: "./storage"
+  s3:
+    bucket: "mcpguard-artifacts"
+    region: "us-east-1"
+    endpoint: ""
+    force-path-style: false

@@ -6,6 +6,9 @@ import (
 
 	"github.com/FlppFer/MCPGuard/config"
 	"github.com/FlppFer/MCPGuard/internal/model/repositories"
+	"gorm.io/driver/sqlite"
+	"gorm.io/gorm"
+	"gorm.io/gorm/logger"
 )
 
 type DatabaseClient interface {
@@ -15,9 +18,30 @@ type DatabaseClient interface {
 }
 
 func NewDatabaseClient(cfgClient *config.DatabaseConfig) (DatabaseClient, error) {
+	if cfgClient == nil {
+		return nil, fmt.Errorf("database configuration is nil")
+	}
+
 	if cfgClient.Mock {
 		return NewMockSQLiteAnalysisRepository()
 	}
-	// TODO: real SQLite file database or PostgreSQL
-	return nil, fmt.Errorf("production DB not implemented yet")
+
+	// Production SQLite file database
+	if cfgClient.Path == "" {
+		cfgClient.Path = "./data/mcpguard.db"
+	}
+
+	db, err := gorm.Open(sqlite.Open(cfgClient.Path), &gorm.Config{
+		Logger: logger.Default.LogMode(logger.Warn),
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to open SQLite DB at %s: %w", cfgClient.Path, err)
+	}
+
+	// Auto-migrate model
+	if err := db.AutoMigrate(&repositories.AnalysisEntity{}); err != nil {
+		return nil, fmt.Errorf("DB migration failed: %w", err)
+	}
+
+	return NewSQLiteAnalysisRepository(db), nil
 }
