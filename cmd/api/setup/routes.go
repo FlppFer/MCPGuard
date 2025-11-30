@@ -23,6 +23,7 @@ func InitRoutes(resources *Resources) {
 		// API endpoints require API key authentication
 		r.Group(func(r chi.Router) {
 			r.Use(middleware.Auth(resources.APIKeyAuthenticator))
+			r.Post("/analysis", resources.GitWebhookController.StartAnalysis()) // Local troubleshooting
 			r.Get("/analysis/{id}/status", resources.GitWebhookController.GetAnalysisStatus())
 			r.Get("/analysis/{id}/result", resources.GitWebhookController.GetAnalysisResult())
 			r.Post("/agentic_analysis", resources.AgenticAnalysisController.RequestAgenticAnalysis())
