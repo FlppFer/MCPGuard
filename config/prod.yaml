@@ -3,7 +3,6 @@ log-level: "error"
 
 data_base:
   mock: false
-  path: "./data/mcpguard.db"
 
 object_storage:
   mock: false

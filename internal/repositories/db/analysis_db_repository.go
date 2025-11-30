@@ -23,12 +23,12 @@ func NewDatabaseClient(cfgClient *config.DatabaseConfig) (DatabaseClient, error)
 	}
 
 	if cfgClient.Mock {
-		return NewMockSQLiteAnalysisRepository()
+		return NewLocalSQLiteAnalysisRepository()
 	}
 
-	// Production SQLite file database
+	// Production SQLite file database stored inside resources folder
 	if cfgClient.Path == "" {
-		cfgClient.Path = "./data/mcpguard.db"
+		cfgClient.Path = "./resources/mcpguard.db"
 	}
 
 	db, err := gorm.Open(sqlite.Open(cfgClient.Path), &gorm.Config{

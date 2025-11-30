@@ -4,37 +4,21 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
-	"os"
-	"path/filepath"
 
 	"github.com/FlppFer/MCPGuard/internal/model/repositories"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 )
 
-const defaultLocalDBPath = "./data/local.db"
-
 type LocalSQLiteAnalysisRepository struct {
-	db     *gorm.DB
-	dbPath string
+	db *gorm.DB
 }
 
 // NewLocalSQLiteAnalysisRepository creates a file-based SQLite repository for local development.
-// If dbPath is empty, it defaults to "./data/local.db"
-func NewLocalSQLiteAnalysisRepository(dbPath string) (DatabaseClient, error) {
-	if dbPath == "" {
-		dbPath = defaultLocalDBPath
-	}
+func NewLocalSQLiteAnalysisRepository() (DatabaseClient, error) {
 
-	// Ensure directory exists
-	dir := filepath.Dir(dbPath)
-	if err := os.MkdirAll(dir, 0755); err != nil {
-		return nil, fmt.Errorf("failed to create database directory: %w", err)
-	}
-
-	slog.Info("Opening local SQLite database", "path", dbPath)
-
-	db, err := gorm.Open(sqlite.Open(dbPath), &gorm.Config{})
+	slog.Info("Opening local SQLite database")
+	db, err := gorm.Open(sqlite.Open("test.db"), &gorm.Config{})
 	if err != nil {
 		return nil, fmt.Errorf("failed to open local SQLite DB: %w", err)
 	}
@@ -44,22 +28,7 @@ func NewLocalSQLiteAnalysisRepository(dbPath string) (DatabaseClient, error) {
 		return nil, fmt.Errorf("local DB migration failed: %w", err)
 	}
 
-	return &LocalSQLiteAnalysisRepository{db: db, dbPath: dbPath}, nil
-}
-
-// NewMockSQLiteAnalysisRepository creates an in-memory SQLite repository for testing.
-func NewMockSQLiteAnalysisRepository() (DatabaseClient, error) {
-	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
-	if err != nil {
-		return nil, fmt.Errorf("failed to open mock SQLite DB: %w", err)
-	}
-
-	// Auto-migrate model
-	if err := db.AutoMigrate(&repositories.AnalysisEntity{}); err != nil {
-		return nil, fmt.Errorf("mock DB migration failed: %w", err)
-	}
-
-	return &LocalSQLiteAnalysisRepository{db: db, dbPath: ":memory:"}, nil
+	return &LocalSQLiteAnalysisRepository{db: db}, nil
 }
 
 func (r *LocalSQLiteAnalysisRepository) Create(ctx context.Context, analysis *repositories.AnalysisEntity) error {
@@ -77,9 +46,4 @@ func (r *LocalSQLiteAnalysisRepository) FindByID(ctx context.Context, id string)
 		return nil, err
 	}
 	return &entity, nil
-}
-
-// DBPath returns the path to the database file
-func (r *LocalSQLiteAnalysisRepository) DBPath() string {
-	return r.dbPath
 }

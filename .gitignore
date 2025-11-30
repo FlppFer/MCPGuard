@@ -35,4 +35,5 @@ go.work.sum
 # Local development data
 data/
 *.db
+mcpguard.db
 analysis_results/
