@@ -2,7 +2,6 @@ package middleware
 
 import (
 	"context"
-	"crypto/subtle"
 	"net/http"
 
 	"github.com/FlppFer/MCPGuard/internal/service"
@@ -47,16 +46,9 @@ func APIKeyAuth(secretsSvc service.SecretsService) func(http.Handler) http.Handl
 				return
 			}
 
-			// Validate API key and get expected client ID
-			expectedClientID, valid := secretsSvc.ValidateAPIKey(apiKey)
-			if !valid {
-				http.Error(w, `{"error":"invalid_api_key","message":"Invalid API key"}`, http.StatusUnauthorized)
-				return
-			}
-
-			// Verify client ID matches (constant-time comparison)
-			if subtle.ConstantTimeCompare([]byte(clientID), []byte(expectedClientID)) != 1 {
-				http.Error(w, `{"error":"client_mismatch","message":"X-Client-ID does not match API key"}`, http.StatusUnauthorized)
+			// Validate credentials - O(1) lookup by clientID
+			if !secretsSvc.ValidateCredentials(clientID, apiKey) {
+				http.Error(w, `{"error":"invalid_credentials","message":"Invalid API key or client ID"}`, http.StatusUnauthorized)
 				return
 			}
 

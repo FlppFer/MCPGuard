@@ -1,6 +1,7 @@
 package service
 
 import (
+	"crypto/subtle"
 	"log/slog"
 	"os"
 	"strings"
@@ -8,26 +9,24 @@ import (
 
 // SecretsService manages API key to client ID mappings from environment variables
 type SecretsService interface {
-	// ValidateAPIKey checks if the API key is valid and returns the associated client ID
-	ValidateAPIKey(apiKey string) (clientID string, valid bool)
-	// GetClientID returns the client ID for a given API key, empty if not found
-	GetClientID(apiKey string) string
+	// ValidateCredentials checks if the API key matches the expected key for the given client ID
+	ValidateCredentials(clientID, apiKey string) bool
 	// IsEnabled returns true if authentication is configured
 	IsEnabled() bool
 }
 
 type secretsServiceImpl struct {
-	// apiKeyToClient maps API keys to their client IDs
-	apiKeyToClient map[string]string
+	// clientToAPIKey maps client IDs to their API keys
+	clientToAPIKey map[string]string
 	enabled        bool
 }
 
 // NewSecretsService creates a new secrets service that loads API keys from environment variables.
-// Environment variable format: MCPGUARD_API_KEYS="key1:client1,key2:client2,key3:client3"
-// Each entry is "api_key:client_id" separated by commas.
+// Environment variable format: MCPGUARD_API_KEYS="client1:key1,client2:key2,client3:key3"
+// Each entry is "client_id:api_key" separated by commas.
 func NewSecretsService() SecretsService {
 	s := &secretsServiceImpl{
-		apiKeyToClient: make(map[string]string),
+		clientToAPIKey: make(map[string]string),
 		enabled:        false,
 	}
 
@@ -38,7 +37,7 @@ func NewSecretsService() SecretsService {
 		return s
 	}
 
-	// Parse format: "key1:client1,key2:client2"
+	// Parse format: "client1:key1,client2:key2"
 	pairs := strings.Split(envKeys, ",")
 	for _, pair := range pairs {
 		pair = strings.TrimSpace(pair)
@@ -48,24 +47,24 @@ func NewSecretsService() SecretsService {
 
 		parts := strings.SplitN(pair, ":", 2)
 		if len(parts) != 2 {
-			slog.Warn("Invalid API key format, expected 'key:client_id'", "entry", pair)
+			slog.Warn("Invalid API key format, expected 'client_id:key'", "entry", pair)
 			continue
 		}
 
-		apiKey := strings.TrimSpace(parts[0])
-		clientID := strings.TrimSpace(parts[1])
+		clientID := strings.TrimSpace(parts[0])
+		apiKey := strings.TrimSpace(parts[1])
 
 		if apiKey == "" || clientID == "" {
 			slog.Warn("Empty API key or client ID", "entry", pair)
 			continue
 		}
 
-		s.apiKeyToClient[apiKey] = clientID
+		s.clientToAPIKey[clientID] = apiKey
 	}
 
-	if len(s.apiKeyToClient) > 0 {
+	if len(s.clientToAPIKey) > 0 {
 		s.enabled = true
-		slog.Info("Loaded API keys from environment", "count", len(s.apiKeyToClient))
+		slog.Info("Loaded API keys from environment", "count", len(s.clientToAPIKey))
 	} else {
 		slog.Warn("No valid API keys found in MCPGUARD_API_KEYS")
 	}
@@ -73,13 +72,13 @@ func NewSecretsService() SecretsService {
 	return s
 }
 
-func (s *secretsServiceImpl) ValidateAPIKey(apiKey string) (string, bool) {
-	clientID, exists := s.apiKeyToClient[apiKey]
-	return clientID, exists
-}
-
-func (s *secretsServiceImpl) GetClientID(apiKey string) string {
-	return s.apiKeyToClient[apiKey]
+func (s *secretsServiceImpl) ValidateCredentials(clientID, apiKey string) bool {
+	expectedKey, exists := s.clientToAPIKey[clientID]
+	if !exists {
+		return false
+	}
+	// Constant-time comparison to prevent timing attacks
+	return subtle.ConstantTimeCompare([]byte(apiKey), []byte(expectedKey)) == 1
 }
 
 func (s *secretsServiceImpl) IsEnabled() bool {

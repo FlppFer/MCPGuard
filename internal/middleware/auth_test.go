@@ -11,17 +11,13 @@ import (
 
 // mockSecretsService implements service.SecretsService for testing
 type mockSecretsService struct {
-	keys    map[string]string // apiKey -> clientID
+	keys    map[string]string // clientID -> apiKey
 	enabled bool
 }
 
-func (m *mockSecretsService) ValidateAPIKey(apiKey string) (string, bool) {
-	clientID, exists := m.keys[apiKey]
-	return clientID, exists
-}
-
-func (m *mockSecretsService) GetClientID(apiKey string) string {
-	return m.keys[apiKey]
+func (m *mockSecretsService) ValidateCredentials(clientID, apiKey string) bool {
+	expectedKey, exists := m.keys[clientID]
+	return exists && expectedKey == apiKey
 }
 
 func (m *mockSecretsService) IsEnabled() bool {
@@ -34,8 +30,8 @@ func newMockSecretsService(keys map[string]string, enabled bool) service.Secrets
 
 func TestAPIKeyAuth(t *testing.T) {
 	mockSvc := newMockSecretsService(map[string]string{
-		"test-key-1": "client-1",
-		"test-key-2": "client-2",
+		"client-1": "test-key-1",
+		"client-2": "test-key-2",
 	}, true)
 
 	tests := []struct {
@@ -64,14 +60,14 @@ func TestAPIKeyAuth(t *testing.T) {
 			apiKey:         "test-key-1",
 			clientID:       "wrong-client",
 			expectedStatus: http.StatusUnauthorized,
-			expectedBody:   "client_mismatch",
+			expectedBody:   "invalid_credentials",
 		},
 		{
 			name:           "invalid key",
 			apiKey:         "wrong-key",
 			clientID:       "client-1",
 			expectedStatus: http.StatusUnauthorized,
-			expectedBody:   "invalid_api_key",
+			expectedBody:   "invalid_credentials",
 		},
 		{
 			name:           "missing api key",
@@ -171,7 +167,7 @@ func TestAPIKeyAuth_NoKeys(t *testing.T) {
 
 func TestGetClientIDFromContext(t *testing.T) {
 	mockSvc := newMockSecretsService(map[string]string{
-		"test-key": "test-client",
+		"test-client": "test-key",
 	}, true)
 
 	var capturedClientID string

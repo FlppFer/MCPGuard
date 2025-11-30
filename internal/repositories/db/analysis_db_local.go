@@ -23,7 +23,7 @@ func NewLocalSQLiteAnalysisRepository() (DatabaseClient, error) {
 		return nil, fmt.Errorf("failed to open local SQLite DB: %w", err)
 	}
 
-	// Auto-migrate models
+	// Auto-migrate model
 	if err := db.AutoMigrate(&repositories.AnalysisEntity{}); err != nil {
 		return nil, fmt.Errorf("local DB migration failed: %w", err)
 	}
