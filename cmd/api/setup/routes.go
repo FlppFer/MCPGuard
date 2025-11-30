@@ -4,25 +4,29 @@ import (
 	"log/slog"
 	"net/http"
 
-	"github.com/FlppFer/MCPGuard/internal/middleware"
-	"github.com/FlppFer/MCPGuard/internal/service"
+	middleware "github.com/FlppFer/MCPGuard/internal/middleware/auth"
 	"github.com/go-chi/chi/v5"
 )
 
-func InitRoutes(secretsSvc service.SecretsService, resources *Resources) {
+func InitRoutes(resources *Resources) {
 	slog.Info("Initializing routes")
 
 	r := chi.NewRouter()
 
-	// Apply API key auth middleware
-	r.Use(middleware.APIKeyAuth(secretsSvc))
-
-	// Git webhook entrypoint exposes StartAnalysis(w, r) so we can use it directly as an http.HandlerFunc
 	r.Route("/v1", func(r chi.Router) {
-		r.Post("/security_analysis", resources.GitWebhookController.StartAnalysis())
-		r.Get("/security_analysis/{id}", resources.GitWebhookController.GetAnalysisStatus())
-		r.Get("/security_analysis/{id}/result", resources.GitWebhookController.GetAnalysisResult())
-		r.Post("/agentic_analysis", resources.AgenticAnalysisController.RequestAgenticAnalysis())
+		// Webhook endpoints require GitHub signature verification
+		r.Group(func(r chi.Router) {
+			r.Use(middleware.WebhookAuth(resources.WebhookAuthenticator))
+			r.Post("/webhook/github", resources.GitWebhookController.StartAnalysis())
+		})
+
+		// API endpoints require API key authentication
+		r.Group(func(r chi.Router) {
+			r.Use(middleware.Auth(resources.APIKeyAuthenticator))
+			r.Get("/analysis/{id}/status", resources.GitWebhookController.GetAnalysisStatus())
+			r.Get("/analysis/{id}/result", resources.GitWebhookController.GetAnalysisResult())
+			r.Post("/agentic_analysis", resources.AgenticAnalysisController.RequestAgenticAnalysis())
+		})
 	})
 
 	// Health check endpoint (no auth required)

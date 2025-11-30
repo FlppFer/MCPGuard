@@ -19,8 +19,8 @@ type (
 	}
 
 	AuthConfig struct {
-		Enabled bool     `yaml:"enabled"`
-		APIKeys []string `yaml:"api_keys"`
+		WebhookSecretKey string `yaml:"webhook_secret_key"` // Env var name for webhook secret
+		APIKeysKey       string `yaml:"api_keys_key"`       // Env var name for API keys (format: "client_id:api_key,...")
 	}
 
 	DatabaseConfig struct {

@@ -8,7 +8,8 @@ object_storage:
   mock: true
   base-path: "mcpguard-local-storage"
 
-# Authentication - disabled by default for local development
+# Authentication Configuration
+# All values are env var names - the app will panic if any env var is not set
 auth:
-  enabled: false
-  api_keys: []
+  webhook_secret_key: "GITHUB_WEBHOOK_SECRET"  # For GitHub webhook signature verification
+  api_keys_key: "MCPGUARD_API_KEYS"            # Format: "client_id:api_key,client_id2:api_key2"

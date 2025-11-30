@@ -13,8 +13,8 @@ object_storage:
     endpoint: ""
     force-path-style: false
 
-# Authentication - enabled in production
-# API keys should be set via environment variable MCPGUARD_API_KEYS (comma-separated)
+# Authentication Configuration
+# All values are env var names - the app will panic if any env var is not set
 auth:
-  enabled: true
-  api_keys: []
+  webhook_secret_key: "GITHUB_WEBHOOK_SECRET"
+  api_keys_key: "MCPGUARD_API_KEYS"
