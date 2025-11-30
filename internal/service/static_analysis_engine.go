@@ -10,6 +10,6 @@ import (
 type StaticAnalysisService interface {
 	// Analyze runs a single file analysis
 	Analyze(language, filePath string, ast interface{}) ([]static_analysis_engine.Finding, error)
-	// RunStaticAnalysis runs analysis on all parsed files for a given analysis ID
-	RunStaticAnalysis(ctx context.Context, analysisID string, files []services.SourceFileDTO) error
+	// RunAnalysis runs analysis on all parsed files and returns results directly
+	RunAnalysis(ctx context.Context, analysisID string, files []services.SourceFileDTO) (*static_analysis_engine.AnalysisResult, error)
 }

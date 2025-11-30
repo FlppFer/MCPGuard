@@ -12,14 +12,17 @@ import (
 
 func DownloadRepo(repoURL, branch, commit string) (*services.RepoDownloadResultDTO, error) {
 	analysisID := uuid.NewString()
-	baseDir := filepath.Join("/tmp", analysisID)
+	baseDir := filepath.Join(os.TempDir(), "mcpguard", analysisID)
 	repoDir := filepath.Join(baseDir, "repo")
 	zipPath := filepath.Join(baseDir, "repo.zip")
 
-	// ensure folder exists
-	if err := os.MkdirAll(repoDir, 0755); err != nil {
+	// Ensure base directory exists (but NOT repoDir - git clone needs it to not exist)
+	if err := os.MkdirAll(baseDir, 0755); err != nil {
 		return nil, err
 	}
+
+	// Remove repoDir if it exists (cleanup from previous failed attempt)
+	_ = os.RemoveAll(repoDir)
 
 	// Clone whole repo (shallow)
 	cloneCmd := exec.Command("git", "clone", "--depth", "1", repoURL, repoDir)

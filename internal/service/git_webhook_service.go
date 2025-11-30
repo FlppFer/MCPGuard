@@ -2,7 +2,11 @@ package service
 
 import (
 	"context"
+	"encoding/json"
+	"fmt"
 	"log"
+	"os"
+	"path/filepath"
 	"time"
 
 	repositories2 "github.com/FlppFer/MCPGuard/internal/model/repositories"
@@ -95,11 +99,24 @@ func (uc *gitWebhookServiceImpl) RequestAnalysis(
 	uc.dbRepo.Update(ctx, entity)
 
 	// 6. Trigger async static analysis
+	// Use background context since the HTTP request context will be cancelled after response
 	go func() {
-		err := uc.staticAnalyzer.RunStaticAnalysis(ctx, analysisID, parsedFiles)
+		asyncCtx := context.Background()
+
+		// Run analysis and get results directly (no local file saving)
+		result, err := uc.staticAnalyzer.RunAnalysis(asyncCtx, analysisID, parsedFiles)
 		if err != nil {
 			log.Println("Static analysis failed:", err)
 			entity.Status = "static_analysis_failed"
+			entity.ErrorMessage = err.Error()
+			uc.dbRepo.Update(context.Background(), entity)
+			return
+		}
+
+		// Upload results to object storage
+		if err := uc.uploadAnalysisResult(asyncCtx, analysisID, result); err != nil {
+			log.Println("Failed to upload analysis results:", err)
+			entity.Status = "storage_upload_failed"
 			entity.ErrorMessage = err.Error()
 			uc.dbRepo.Update(context.Background(), entity)
 			return
@@ -117,4 +134,29 @@ func (uc *gitWebhookServiceImpl) RequestAnalysis(
 		Status:     repositories2.StatusCreated.String(),
 		Timestamp:  time.Now(),
 	}, nil
+}
+
+// uploadAnalysisResult serializes the analysis result to JSON and uploads it to object storage
+func (uc *gitWebhookServiceImpl) uploadAnalysisResult(ctx context.Context, analysisID string, result interface{}) error {
+	// Serialize result to JSON
+	data, err := json.MarshalIndent(result, "", "  ")
+	if err != nil {
+		return fmt.Errorf("failed to marshal analysis result: %w", err)
+	}
+
+	// Write to temp file (required by storage interface)
+	tmpFile := filepath.Join(os.TempDir(), fmt.Sprintf("%s_static.json", analysisID))
+	if err := os.WriteFile(tmpFile, data, 0644); err != nil {
+		return fmt.Errorf("failed to write temp file: %w", err)
+	}
+	defer os.Remove(tmpFile)
+
+	// Upload to object storage
+	s3Key := fmt.Sprintf("analysis-results/%s_static.json", analysisID)
+	if err := uc.storageRepo.UploadFile(ctx, s3Key, tmpFile); err != nil {
+		return fmt.Errorf("failed to upload to storage: %w", err)
+	}
+
+	log.Printf("Analysis results uploaded to storage: %s", s3Key)
+	return nil
 }

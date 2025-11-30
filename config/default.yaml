@@ -6,4 +6,4 @@ data_base:
 
 object_storage:
   mock: true
-  base-path: "./storage"
+  base-path: "mcpguard-local-storage"

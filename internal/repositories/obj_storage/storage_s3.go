@@ -8,6 +8,7 @@ import (
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	awsconfig "github.com/aws/aws-sdk-go-v2/config"
+	"github.com/aws/aws-sdk-go-v2/credentials"
 	"github.com/aws/aws-sdk-go-v2/feature/s3/manager"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 )
@@ -38,12 +39,14 @@ func NewS3Storage(ctx context.Context, bucket string, endpoint string, region st
 	var err error
 
 	if endpoint != "" {
+		// Custom endpoint (LocalStack, MinIO, etc.) - use static dummy credentials
 		cfg, err = awsconfig.LoadDefaultConfig(ctx,
 			awsconfig.WithRegion(region),
+			awsconfig.WithCredentialsProvider(credentials.NewStaticCredentialsProvider("test", "test", "")),
 			awsconfig.WithEndpointResolverWithOptions(customEndpointResolver{endpoint: endpoint}),
 		)
 	} else {
-		// Use normal resolution (AWS)
+		// Use normal resolution (AWS) with default credential chain
 		cfg, err = awsconfig.LoadDefaultConfig(ctx, awsconfig.WithRegion(region))
 	}
 	if err != nil {
@@ -51,8 +54,7 @@ func NewS3Storage(ctx context.Context, bucket string, endpoint string, region st
 	}
 
 	client := s3.NewFromConfig(cfg, func(o *s3.Options) {
-		o.UsePathStyle = forcePathStyle // required for MinIO compatibility
-		// o.Region already set from cfg
+		o.UsePathStyle = forcePathStyle // required for LocalStack/MinIO compatibility
 	})
 
 	return &S3Storage{
