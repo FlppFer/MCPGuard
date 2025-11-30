@@ -2,7 +2,9 @@ package middleware
 
 import (
 	"context"
+	"fmt"
 	"net/http"
+	"strings"
 
 	"github.com/FlppFer/MCPGuard/internal/service"
 )
@@ -36,13 +38,16 @@ func APIKeyAuth(secretsSvc service.SecretsService) func(http.Handler) http.Handl
 			apiKey := r.Header.Get(APIKeyHeader)
 			clientID := r.Header.Get(ClientIDHeader)
 
+			var missingHeaders []string
 			if apiKey == "" {
-				http.Error(w, `{"error":"missing_api_key","message":"X-API-Key header is required"}`, http.StatusUnauthorized)
-				return
+				missingHeaders = append(missingHeaders, APIKeyHeader)
 			}
-
 			if clientID == "" {
-				http.Error(w, `{"error":"missing_client_id","message":"X-Client-ID header is required"}`, http.StatusUnauthorized)
+				missingHeaders = append(missingHeaders, ClientIDHeader)
+			}
+			if len(missingHeaders) > 0 {
+				msg := fmt.Sprintf(`{"error":"missing_headers","message":"Missing required headers: %s"}`, strings.Join(missingHeaders, ", "))
+				http.Error(w, msg, http.StatusUnauthorized)
 				return
 			}
 
