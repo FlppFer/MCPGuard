@@ -74,14 +74,21 @@ func TestAPIKeyAuth(t *testing.T) {
 			apiKey:         "",
 			clientID:       "client-1",
 			expectedStatus: http.StatusUnauthorized,
-			expectedBody:   "missing_api_key",
+			expectedBody:   "X-API-Key",
 		},
 		{
 			name:           "missing client id",
 			apiKey:         "test-key-1",
 			clientID:       "",
 			expectedStatus: http.StatusUnauthorized,
-			expectedBody:   "missing_client_id",
+			expectedBody:   "X-Client-ID",
+		},
+		{
+			name:           "missing both headers",
+			apiKey:         "",
+			clientID:       "",
+			expectedStatus: http.StatusUnauthorized,
+			expectedBody:   "X-API-Key, X-Client-ID",
 		},
 	}
 
