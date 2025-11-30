@@ -65,7 +65,7 @@ func TestLocalStackStorage_UploadAndDownload(t *testing.T) {
 	t.Logf("Generated URL: %s", url)
 }
 
-// AnalysisResult mirrors the struct from static_analysis_engine for testing
+// AnalysisResult mirrors the struct from static_analysis for testing
 type AnalysisResult struct {
 	AnalysisID string    `json:"analysis_id"`
 	Files      int       `json:"files_analyzed"`

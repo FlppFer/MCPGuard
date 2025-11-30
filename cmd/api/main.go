@@ -7,6 +7,7 @@ import (
 
 	"github.com/FlppFer/MCPGuard/cmd/api/setup"
 	"github.com/FlppFer/MCPGuard/config"
+	"github.com/FlppFer/MCPGuard/internal/service"
 )
 
 func main() {
@@ -27,7 +28,10 @@ func run(ctx context.Context) error {
 
 	resources := setup.Bootstrap(ctx, cfg)
 
+	// Initialize secrets service from environment variables
+	secretsSvc := service.NewSecretsService()
+
 	fmt.Println("MCPGuard - Initializing server")
-	setup.InitRoutes(resources)
+	setup.InitRoutes(secretsSvc, resources)
 	return nil
 }

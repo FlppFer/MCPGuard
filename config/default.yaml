@@ -7,3 +7,8 @@ data_base:
 object_storage:
   mock: true
   base-path: "mcpguard-local-storage"
+
+# Authentication - disabled by default for local development
+auth:
+  enabled: false
+  api_keys: []

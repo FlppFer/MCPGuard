@@ -12,3 +12,9 @@ object_storage:
     region: "us-east-1"
     endpoint: ""
     force-path-style: false
+
+# Authentication - enabled in production
+# API keys should be set via environment variable MCPGUARD_API_KEYS (comma-separated)
+auth:
+  enabled: true
+  api_keys: []

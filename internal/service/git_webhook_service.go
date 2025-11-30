@@ -13,6 +13,7 @@ import (
 	"github.com/FlppFer/MCPGuard/internal/model/services"
 	"github.com/FlppFer/MCPGuard/internal/repositories/db"
 	"github.com/FlppFer/MCPGuard/internal/repositories/obj_storage"
+	"github.com/FlppFer/MCPGuard/internal/service/static_analysis"
 	"github.com/FlppFer/MCPGuard/internal/utils"
 	"github.com/google/uuid"
 )
@@ -24,15 +25,15 @@ type GitWebhookService interface {
 }
 
 type gitWebhookServiceImpl struct {
-	dbRepo         db.DatabaseClient             // SQLite GORM implementation
-	storageRepo    obj_storage.StorageRepository // S3/Local obj_storage implementation
-	staticAnalyzer StaticAnalysisService         // Your static analysis engine
+	dbRepo         db.DatabaseClient                     // SQLite GORM implementation
+	storageRepo    obj_storage.StorageRepository         // S3/Local obj_storage implementation
+	staticAnalyzer static_analysis.StaticAnalysisService // Your static analysis engine
 }
 
 func NewGitWebhookService(
 	dbRepo db.DatabaseClient,
 	storageRepo obj_storage.StorageRepository,
-	staticAnalyzer StaticAnalysisService,
+	staticAnalyzer static_analysis.StaticAnalysisService,
 ) GitWebhookService {
 
 	return &gitWebhookServiceImpl{

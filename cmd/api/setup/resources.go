@@ -8,10 +8,10 @@ import (
 	"github.com/FlppFer/MCPGuard/internal/repositories/db"
 	"github.com/FlppFer/MCPGuard/internal/repositories/obj_storage"
 	"github.com/FlppFer/MCPGuard/internal/service"
-	"github.com/FlppFer/MCPGuard/internal/service/static_analysis_engine"
+	"github.com/FlppFer/MCPGuard/internal/service/static_analysis"
 
 	// Import rules package to trigger init() functions that register all analysis rules
-	_ "github.com/FlppFer/MCPGuard/internal/service/static_analysis_engine/languages/python/rules"
+	_ "github.com/FlppFer/MCPGuard/internal/service/static_analysis/languages/python/rules"
 )
 
 type (
@@ -33,8 +33,8 @@ func Bootstrap(ctx context.Context, cfg *config.Config) *Resources {
 	}
 
 	// Create engine with local persistence disabled (results go to S3)
-	staticAnalyzerEngine := static_analysis_engine.NewStaticAnalyzerEngine(
-		static_analysis_engine.WithPersistence(false),
+	staticAnalyzerEngine := static_analysis.NewStaticAnalyzerEngine(
+		static_analysis.WithPersistence(false),
 	)
 
 	gitWebhookService := service.NewGitWebhookService(dbClient, osClient, staticAnalyzerEngine)

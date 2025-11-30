@@ -38,7 +38,7 @@ func NewDatabaseClient(cfgClient *config.DatabaseConfig) (DatabaseClient, error)
 		return nil, fmt.Errorf("failed to open SQLite DB at %s: %w", cfgClient.Path, err)
 	}
 
-	// Auto-migrate model
+	// Auto-migrate models
 	if err := db.AutoMigrate(&repositories.AnalysisEntity{}); err != nil {
 		return nil, fmt.Errorf("DB migration failed: %w", err)
 	}

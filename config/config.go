@@ -15,6 +15,12 @@ type (
 		LogLevel         string               `yaml:"log-level"`
 		DbCfg            *DatabaseConfig      `yaml:"data_base"`
 		ObjectStorageCfg *ObjectStorageConfig `yaml:"object_storage"`
+		AuthCfg          *AuthConfig          `yaml:"auth"`
+	}
+
+	AuthConfig struct {
+		Enabled bool     `yaml:"enabled"`
+		APIKeys []string `yaml:"api_keys"`
 	}
 
 	DatabaseConfig struct {
