@@ -18,6 +18,7 @@ func InitRoutes(resources *Resources) {
 	r.Route("/v1", func(r chi.Router) {
 		r.Post("/security_analysis", resources.GitWebhookController.StartAnalysis())
 		r.Get("/security_analysis/{id}", resources.GitWebhookController.GetAnalysisStatus())
+		r.Get("/security_analysis/{id}/result", resources.GitWebhookController.GetAnalysisResult())
 		r.Post("/agentic_analysis", resources.AgenticAnalysisController.RequestAgenticAnalysis())
 	})
 

@@ -19,6 +19,8 @@ import (
 
 type GitWebhookService interface {
 	RequestAnalysis(ctx context.Context, repoURL, branch, commit string) (*services.GitWebhookAnalysisResultDTO, error)
+	GetAnalysisStatus(ctx context.Context, analysisID string) (*services.AnalysisStatusDTO, error)
+	GetAnalysisResult(ctx context.Context, analysisID string) ([]byte, error)
 }
 
 type gitWebhookServiceImpl struct {
@@ -159,4 +161,45 @@ func (uc *gitWebhookServiceImpl) uploadAnalysisResult(ctx context.Context, analy
 
 	log.Printf("Analysis results uploaded to storage: %s", s3Key)
 	return nil
+}
+
+// GetAnalysisStatus retrieves the current status of an analysis from the database
+func (uc *gitWebhookServiceImpl) GetAnalysisStatus(ctx context.Context, analysisID string) (*services.AnalysisStatusDTO, error) {
+	entity, err := uc.dbRepo.FindByID(ctx, analysisID)
+	if err != nil {
+		return nil, fmt.Errorf("analysis not found: %w", err)
+	}
+
+	return &services.AnalysisStatusDTO{
+		AnalysisID:   entity.ID,
+		RepoURL:      entity.RepoURL,
+		Branch:       entity.Branch,
+		Commit:       entity.Commit,
+		Status:       entity.Status,
+		ErrorMessage: entity.ErrorMessage,
+		CreatedAt:    entity.CreatedAt,
+		UpdatedAt:    entity.UpdatedAt,
+	}, nil
+}
+
+// GetAnalysisResult retrieves the analysis result JSON from object storage
+func (uc *gitWebhookServiceImpl) GetAnalysisResult(ctx context.Context, analysisID string) ([]byte, error) {
+	// First check if analysis exists and is complete
+	entity, err := uc.dbRepo.FindByID(ctx, analysisID)
+	if err != nil {
+		return nil, fmt.Errorf("analysis not found: %w", err)
+	}
+
+	if entity.Status != "static_done" && entity.Status != "completed" {
+		return nil, fmt.Errorf("analysis not complete, current status: %s", entity.Status)
+	}
+
+	// Download result from S3
+	s3Key := fmt.Sprintf("analysis-results/%s_static.json", analysisID)
+	data, err := uc.storageRepo.DownloadFile(ctx, s3Key)
+	if err != nil {
+		return nil, fmt.Errorf("failed to download result: %w", err)
+	}
+
+	return data, nil
 }

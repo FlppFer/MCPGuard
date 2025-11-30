@@ -4,7 +4,10 @@ import (
 	"encoding/json"
 	"log/slog"
 	"net/http"
+	"strings"
 	"time"
+
+	"github.com/go-chi/chi/v5"
 
 	httpmodel "github.com/FlppFer/MCPGuard/internal/model/http"
 	"github.com/FlppFer/MCPGuard/internal/service"
@@ -13,6 +16,7 @@ import (
 type GitWebhookControllerInterface interface {
 	StartAnalysis() http.HandlerFunc
 	GetAnalysisStatus() http.HandlerFunc
+	GetAnalysisResult() http.HandlerFunc
 }
 
 type gitWebhookController struct {
@@ -64,8 +68,47 @@ func (c *gitWebhookController) StartAnalysis() http.HandlerFunc {
 
 func (c *gitWebhookController) GetAnalysisStatus() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		// TODO: Implement status check endpoint
-		c.writeError(w, http.StatusNotImplemented, "not_implemented", "Status endpoint not yet implemented")
+		analysisID := chi.URLParam(r, "id")
+		if analysisID == "" {
+			c.writeError(w, http.StatusBadRequest, "missing_id", "Analysis ID is required")
+			return
+		}
+
+		status, err := c.gitWebhookService.GetAnalysisStatus(r.Context(), analysisID)
+		if err != nil {
+			slog.Error("Failed to get analysis status", "error", err, "analysis_id", analysisID)
+			c.writeError(w, http.StatusNotFound, "not_found", err.Error())
+			return
+		}
+
+		c.writeJSON(w, http.StatusOK, status)
+	}
+}
+
+func (c *gitWebhookController) GetAnalysisResult() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		analysisID := chi.URLParam(r, "id")
+		if analysisID == "" {
+			c.writeError(w, http.StatusBadRequest, "missing_id", "Analysis ID is required")
+			return
+		}
+
+		data, err := c.gitWebhookService.GetAnalysisResult(r.Context(), analysisID)
+		if err != nil {
+			slog.Error("Failed to get analysis result", "error", err, "analysis_id", analysisID)
+			// Check if it's a "not complete" error vs "not found"
+			if strings.Contains(err.Error(), "not complete") {
+				c.writeError(w, http.StatusAccepted, "analysis_pending", err.Error())
+			} else {
+				c.writeError(w, http.StatusNotFound, "not_found", err.Error())
+			}
+			return
+		}
+
+		// Return raw JSON result
+		w.Header().Set("Content-Type", "application/json; charset=UTF-8")
+		w.WriteHeader(http.StatusOK)
+		w.Write(data)
 	}
 }
 
