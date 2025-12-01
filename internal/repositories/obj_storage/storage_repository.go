@@ -20,7 +20,11 @@ func NewObjectStorageClient(cfg *config.ObjectStorageConfig) (StorageRepository,
 	}
 
 	if cfg.Mock {
-		return NewLocalStorage(cfg.BasePath), nil
+		localStorage, err := NewLocalStorage(cfg.BasePath)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create local storage: %w", err)
+		}
+		return localStorage, nil
 	}
 
 	// Production S3 storage

@@ -16,7 +16,10 @@ const testBucket = "mcpguard-test-bucket"
 
 func TestLocalStackStorage_UploadAndDownload(t *testing.T) {
 	// Create LocalStack-backed storage (starts Docker container)
-	storage := obj_storage.NewLocalStorage(testBucket)
+	storage, err := obj_storage.NewLocalStorage(testBucket)
+	if err != nil {
+		t.Fatalf("Failed to create LocalStack storage: %v", err)
+	}
 	t.Cleanup(func() {
 		storage.Stop()
 	})
@@ -82,7 +85,10 @@ type Finding struct {
 }
 
 func TestLocalStackStorage_AnalysisResultUpload(t *testing.T) {
-	storage := obj_storage.NewLocalStorage(testBucket)
+	storage, err := obj_storage.NewLocalStorage(testBucket)
+	if err != nil {
+		t.Fatalf("Failed to create LocalStack storage: %v", err)
+	}
 	t.Cleanup(func() {
 		storage.Stop()
 	})

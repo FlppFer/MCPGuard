@@ -30,7 +30,6 @@ go.work.sum
 # Editor/IDE
 .idea/
 .vscode/
-*debug_bin.exe
 
 # Local development data
 data/

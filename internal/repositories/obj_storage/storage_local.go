@@ -19,20 +19,24 @@ type LocalStackStorage struct {
 	bucket   string
 }
 
+const (
+	LocalStackErrorMessage = "Failed to create LocalStack instance"
+)
+
 // NewLocalStorage creates a LocalStack-backed S3 storage for local development.
 // It starts a LocalStack Docker container and creates the specified bucket.
-func NewLocalStorage(bucket string) *LocalStackStorage {
+func NewLocalStorage(bucket string) (*LocalStackStorage, error) {
 	ctx := context.Background()
 
 	instance, err := localstack.NewInstance()
 	if err != nil {
-		slog.Error("Failed to create LocalStack instance", "error", err)
-		panic(fmt.Sprintf("LocalStack requires Docker: %v", err))
+		slog.Error(LocalStackErrorMessage, "error", err)
+		return nil, fmt.Errorf("%s: %w", LocalStackErrorMessage, err)
 	}
 
 	if err := instance.Start(); err != nil {
 		slog.Error("Failed to start LocalStack", "error", err)
-		panic(fmt.Sprintf("Failed to start LocalStack: %v", err))
+		return nil, fmt.Errorf("%s: %w", LocalStackErrorMessage, err)
 	}
 
 	endpoint := instance.EndpointV2(localstack.S3)
@@ -45,7 +49,8 @@ func NewLocalStorage(bucket string) *LocalStackStorage {
 	)
 	if err != nil {
 		instance.Stop()
-		panic(fmt.Sprintf("Failed to load AWS config: %v", err))
+		slog.Error("Failed to load AWS config", "error", err)
+		return nil, fmt.Errorf("%s: %w", LocalStackErrorMessage, err)
 	}
 
 	s3Client := s3.NewFromConfig(cfg, func(o *s3.Options) {
@@ -65,14 +70,15 @@ func NewLocalStorage(bucket string) *LocalStackStorage {
 	s3Storage, err := NewS3Storage(ctx, bucket, endpoint, "us-east-1", true)
 	if err != nil {
 		instance.Stop()
-		panic(fmt.Sprintf("Failed to create S3Storage: %v", err))
+		slog.Error("Failed to create S3Storage", "error", err)
+		return nil, fmt.Errorf("%s: %w", LocalStackErrorMessage, err)
 	}
 
 	return &LocalStackStorage{
 		S3Storage: s3Storage,
 		instance:  instance,
 		bucket:    bucket,
-	}
+	}, nil
 }
 
 // Stop gracefully shuts down the LocalStack container
