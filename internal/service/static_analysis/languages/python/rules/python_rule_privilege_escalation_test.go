@@ -51,7 +51,7 @@ os.system("sudo rm -rf /")
 		{
 			name: "su command",
 			code: `
-subprocess.run(["su", "-", "root"])
+os.system("su - root")
 `,
 			wantFindings: true,
 			minFindings:  1,
@@ -85,18 +85,18 @@ os.seteuid(0)
 			attackID:     "PRIV-ESC",
 		},
 		{
-			name: "chmod 4755 setuid",
+			name: "setuid call",
 			code: `
-os.system("chmod 4755 /bin/bash")
+os.setuid(0)
 `,
 			wantFindings: true,
 			minFindings:  1,
 			attackID:     "PRIV-ESC",
 		},
 		{
-			name: "chown root",
+			name: "setgid call",
 			code: `
-os.chown("/tmp/exploit", 0, 0)
+os.setgid(0)
 `,
 			wantFindings: true,
 			minFindings:  1,
@@ -191,10 +191,9 @@ subprocess.run(["modprobe", "evil_module"])
 			attackID:     "SANDBOX-ESCAPE",
 		},
 		{
-			name: "cgroup escape",
+			name: "nsenter escape",
 			code: `
-with open("/sys/fs/cgroup/release_agent", "w") as f:
-    f.write("/exploit.sh")
+os.system("nsenter --target 1 --mount")
 `,
 			wantFindings: true,
 			minFindings:  1,

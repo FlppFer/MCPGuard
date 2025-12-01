@@ -12,7 +12,7 @@ import (
 	_ "github.com/FlppFer/MCPGuard/internal/service/static_analysis/languages/python/rules"
 )
 
-const testDataDir = "../../../docs/test"
+const testDataDir = "../../../resources/test"
 
 // newTestEngine creates an engine configured for testing (no persistence by default)
 func newTestEngine(t *testing.T) *sae.Engine {
@@ -648,14 +648,9 @@ func TestRunStaticAnalysis_MaliciousUser(t *testing.T) {
 	ctx := context.Background()
 	files := []services.SourceFileDTO{loadTestFile(t, "test_malicious_user.py")}
 
-	err := engine.RunStaticAnalysis(ctx, "test-malicious-user", files)
+	result, err := engine.RunAnalysis(ctx, "test-malicious-user", files)
 	if err != nil {
-		t.Fatalf("RunStaticAnalysis failed: %v", err)
-	}
-
-	result, err := engine.LoadAnalysisResult("test-malicious-user")
-	if err != nil {
-		t.Fatalf("Failed to load results: %v", err)
+		t.Fatalf("RunAnalysis failed: %v", err)
 	}
 
 	if len(result.Findings) == 0 {
@@ -670,14 +665,9 @@ func TestRunStaticAnalysis_ContextPoisoning(t *testing.T) {
 	ctx := context.Background()
 	files := []services.SourceFileDTO{loadTestFile(t, "test_context_poisoning.py")}
 
-	err := engine.RunStaticAnalysis(ctx, "test-context", files)
+	result, err := engine.RunAnalysis(ctx, "test-context", files)
 	if err != nil {
-		t.Fatalf("RunStaticAnalysis failed: %v", err)
-	}
-
-	result, err := engine.LoadAnalysisResult("test-context")
-	if err != nil {
-		t.Fatalf("Failed to load results: %v", err)
+		t.Fatalf("RunAnalysis failed: %v", err)
 	}
 
 	if len(result.Findings) == 0 {
@@ -700,14 +690,9 @@ func TestRunStaticAnalysis_CleanCode_NoFindings(t *testing.T) {
 	ctx := context.Background()
 	files := []services.SourceFileDTO{loadTestFile(t, "test_clean_code.py")}
 
-	err := engine.RunStaticAnalysis(ctx, "test-clean", files)
+	result, err := engine.RunAnalysis(ctx, "test-clean", files)
 	if err != nil {
-		t.Fatalf("RunStaticAnalysis failed: %v", err)
-	}
-
-	result, err := engine.LoadAnalysisResult("test-clean")
-	if err != nil {
-		t.Fatalf("Failed to load results: %v", err)
+		t.Fatalf("RunAnalysis failed: %v", err)
 	}
 
 	if len(result.Findings) > 0 {
@@ -737,14 +722,9 @@ func TestRunStaticAnalysis_AllFiles_ComprehensiveValidation(t *testing.T) {
 		files = append(files, loadTestFile(t, f))
 	}
 
-	err := engine.RunStaticAnalysis(ctx, "test-all-comprehensive", files)
+	result, err := engine.RunAnalysis(ctx, "test-all-comprehensive", files)
 	if err != nil {
-		t.Fatalf("RunStaticAnalysis failed: %v", err)
-	}
-
-	result, err := engine.LoadAnalysisResult("test-all-comprehensive")
-	if err != nil {
-		t.Fatalf("Failed to load results: %v", err)
+		t.Fatalf("RunAnalysis failed: %v", err)
 	}
 
 	if len(result.Findings) < 50 {
@@ -800,14 +780,9 @@ func TestRunStaticAnalysis_FindingStructIntegrity(t *testing.T) {
 	ctx := context.Background()
 	files := []services.SourceFileDTO{loadTestFile(t, "test_command_injection.py")}
 
-	err := engine.RunStaticAnalysis(ctx, "test-struct-integrity", files)
+	result, err := engine.RunAnalysis(ctx, "test-struct-integrity", files)
 	if err != nil {
-		t.Fatalf("RunStaticAnalysis failed: %v", err)
-	}
-
-	result, err := engine.LoadAnalysisResult("test-struct-integrity")
-	if err != nil {
-		t.Fatalf("Failed to load results: %v", err)
+		t.Fatalf("RunAnalysis failed: %v", err)
 	}
 
 	if len(result.Findings) == 0 {

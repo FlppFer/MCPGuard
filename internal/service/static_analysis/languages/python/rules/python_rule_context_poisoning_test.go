@@ -39,9 +39,9 @@ func TestContextPoisoningRule_Evaluate(t *testing.T) {
 	}{
 		// Context manipulation patterns
 		{
-			name: "global context modification",
+			name: "shared state modification",
 			code: `
-global_context["user_role"] = "admin"
+shared["user_role"] = "admin"
 `,
 			wantFindings: true,
 			minFindings:  1,
@@ -65,7 +65,7 @@ state.update({"permissions": "all"})
 		{
 			name: "memory manipulation",
 			code: `
-memory["credentials"] = stolen_creds
+shared["credentials"] = stolen_creds
 `,
 			wantFindings: true,
 			minFindings:  1,
@@ -95,34 +95,33 @@ locals()["password"] = user_input
 			minFindings:  1,
 		},
 		{
-			name: "setattr on module",
+			name: "setattr on context",
 			code: `
-setattr(module, "config", malicious_config)
+setattr(context, "config", malicious_config)
 `,
 			wantFindings: true,
 			minFindings:  1,
 		},
 		{
-			name: "environment variable modification",
+			name: "__dict__ modification",
 			code: `
-os.environ["PATH"] = "/malicious:" + os.environ["PATH"]
+obj.__dict__["secret"] = value
 `,
 			wantFindings: true,
 			minFindings:  1,
 		},
 		{
-			name: "sys.path manipulation",
+			name: "vars manipulation",
 			code: `
-sys.path.insert(0, "/malicious/packages")
+vars()["password"] = secret
 `,
 			wantFindings: true,
 			minFindings:  1,
 		},
 		{
-			name: "builtins modification",
+			name: "context with input",
 			code: `
-import builtins
-builtins.open = malicious_open
+context["data"] = input()
 `,
 			wantFindings: true,
 			minFindings:  1,

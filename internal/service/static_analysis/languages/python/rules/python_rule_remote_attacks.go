@@ -144,7 +144,7 @@ var remoteAttackPatterns = []struct {
 		attackID:    "RCE",
 	},
 	{
-		pattern:     regexp.MustCompile(`(?i)wget\s+[^|]*(-O\s*-|--output-document=-)\s*\|\s*(bash|sh|python)`),
+		pattern:     regexp.MustCompile(`(?i)wget\s+.*(-O\s*-|--output-document=-).*\|\s*(bash|sh|python)`),
 		description: "Remote script download and execution via wget",
 		severity:    static_analysis.SeverityCritical,
 		attackID:    "RCE",

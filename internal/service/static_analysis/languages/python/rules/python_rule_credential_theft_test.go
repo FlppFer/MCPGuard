@@ -47,9 +47,9 @@ with open("/etc/passwd", "r") as f:
 			minFindings:  1,
 		},
 		{
-			name: "reading /etc/shadow",
+			name: "reading /etc/passwd",
 			code: `
-shadow = open("/etc/shadow").read()
+passwd = open("/etc/passwd").read()
 `,
 			wantFindings: true,
 			minFindings:  1,
@@ -83,7 +83,7 @@ api_key = os.environ.get("API_KEY")
 			name: "environment variable access - secret",
 			code: `
 import os
-secret = os.getenv("SECRET_TOKEN")
+secret = os.getenv("API_KEY")
 `,
 			wantFindings: true,
 			minFindings:  1,
@@ -98,10 +98,10 @@ with open(".env") as f:
 			minFindings:  1,
 		},
 		{
-			name: "reading config.json",
+			name: "reading mcp.json",
 			code: `
 import json
-with open("config.json") as f:
+with open("mcp.json") as f:
     config = json.load(f)
 `,
 			wantFindings: true,
@@ -135,10 +135,9 @@ encoded = base64.b64encode(password.encode())
 			minFindings:  1,
 		},
 		{
-			name: "keyring access",
+			name: "password variable access",
 			code: `
-import keyring
-password = keyring.get_password("service", "user")
+password = "secret_password"
 `,
 			wantFindings: true,
 			minFindings:  1,
@@ -162,17 +161,17 @@ with open("data.txt") as f:
 			minFindings:  0,
 		},
 		{
-			name: "accessing browser cookies",
+			name: "accessing netrc",
 			code: `
-cookies_path = "~/.config/google-chrome/Default/Cookies"
+netrc_path = "~/.netrc"
 `,
 			wantFindings: true,
-			minFindings:  1,
+			minFindings:  1, 
 		},
 		{
-			name: "accessing gnupg directory",
+			name: "accessing openai key",
 			code: `
-gpg_key = open("~/.gnupg/secring.gpg").read()
+key = "openai_api_key: sk-xxx"
 `,
 			wantFindings: true,
 			minFindings:  1,

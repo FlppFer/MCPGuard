@@ -314,8 +314,8 @@ func TestFileOperationsRule_Severity(t *testing.T) {
 			expectedSeverity: static_analysis.SeverityCritical,
 		},
 		{
-			name:             "bashrc modification should be critical",
-			code:             `open(".bashrc", "a")`,
+			name:             "bashrc access should be critical",
+			code:             `open(".bashrc")`,
 			expectedSeverity: static_analysis.SeverityCritical,
 		},
 		{

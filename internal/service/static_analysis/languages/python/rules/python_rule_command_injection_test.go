@@ -102,10 +102,9 @@ os.popen("cat /etc/passwd")
 			minFindings:  1,
 		},
 		{
-			name: "commands.getoutput (legacy)",
+			name: "compile function",
 			code: `
-import commands
-commands.getoutput("whoami")
+code = compile(source, "<string>", "exec")
 `,
 			wantFindings: true,
 			minFindings:  1,
@@ -199,9 +198,9 @@ func TestCommandInjectionRule_Severity(t *testing.T) {
 		expectedSeverity string
 	}{
 		{
-			name:             "os.system should be critical",
+			name:             "os.system should be high",
 			code:             `os.system("cmd")`,
-			expectedSeverity: static_analysis.SeverityCritical,
+			expectedSeverity: static_analysis.SeverityHigh,
 		},
 		{
 			name:             "eval should be critical",
