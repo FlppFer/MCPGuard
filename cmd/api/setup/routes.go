@@ -17,7 +17,7 @@ func InitRoutes(resources *Resources) {
 		// Webhook endpoints require GitHub signature verification
 		r.Group(func(r chi.Router) {
 			r.Use(middleware.WebhookAuth(resources.WebhookAuthenticator))
-			r.Post("/webhook/github", resources.GitWebhookController.StartAnalysis())
+			r.Post("/webhook/github", resources.GitWebhookController.HandleGitHubWebhook())
 		})
 
 		// API endpoints require API key authentication

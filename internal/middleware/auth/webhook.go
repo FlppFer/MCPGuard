@@ -40,16 +40,23 @@ func (a *webhookAuthenticator) Authenticate(r *http.Request) string {
 
 func (a *webhookAuthenticator) ValidateSignature(payload []byte, signature string) bool {
 	if a.secret == "" || signature == "" {
+		slog.Warn("Webhook validation failed: empty secret or signature",
+			"secret_empty", a.secret == "",
+			"signature_empty", signature == "")
 		return false
 	}
 
 	const prefix = "sha256="
 	if len(signature) < len(prefix) || signature[:len(prefix)] != prefix {
+		slog.Warn("Webhook validation failed: invalid signature prefix",
+			"signature", signature)
 		return false
 	}
 
 	receivedMAC, err := hex.DecodeString(signature[len(prefix):])
 	if err != nil {
+		slog.Warn("Webhook validation failed: could not decode signature",
+			"error", err)
 		return false
 	}
 
@@ -57,5 +64,12 @@ func (a *webhookAuthenticator) ValidateSignature(payload []byte, signature strin
 	mac.Write(payload)
 	expectedMAC := mac.Sum(nil)
 
-	return hmac.Equal(receivedMAC, expectedMAC)
+	valid := hmac.Equal(receivedMAC, expectedMAC)
+	if !valid {
+		slog.Warn("Webhook signature mismatch",
+			"received", hex.EncodeToString(receivedMAC),
+			"expected", hex.EncodeToString(expectedMAC),
+			"payload_len", len(payload))
+	}
+	return valid
 }

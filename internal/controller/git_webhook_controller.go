@@ -15,6 +15,7 @@ import (
 
 type GitWebhookControllerInterface interface {
 	StartAnalysis() http.HandlerFunc
+	HandleGitHubWebhook() http.HandlerFunc
 	GetAnalysisStatus() http.HandlerFunc
 	GetAnalysisResult() http.HandlerFunc
 }
@@ -51,6 +52,49 @@ func (c *gitWebhookController) StartAnalysis() http.HandlerFunc {
 		result, err := c.gitWebhookService.RequestAnalysis(r.Context(), req.RepoURL, req.Branch, req.Commit)
 		if err != nil {
 			slog.Error("Failed to start analysis", "error", err)
+			c.writeError(w, http.StatusInternalServerError, "analysis_failed", err.Error())
+			return
+		}
+
+		resp := httpmodel.WebHookResponseDTO{
+			AnalysisID: result.AnalysisID,
+			Status:     result.Status,
+			Message:    "Analysis started successfully",
+			Timestamp:  time.Now(),
+		}
+
+		c.writeJSON(w, http.StatusAccepted, resp)
+	}
+}
+
+// HandleGitHubWebhook handles GitHub push webhook events
+func (c *gitWebhookController) HandleGitHubWebhook() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		var payload httpmodel.GitHubPushPayload
+
+		if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+			slog.Error("Failed to parse GitHub webhook payload", "error", err)
+			c.writeError(w, http.StatusBadRequest, "invalid_payload", "Failed to parse GitHub webhook payload")
+			return
+		}
+
+		repoURL := payload.GetRepoURL()
+		branch := payload.GetBranch()
+		commit := payload.GetCommit()
+
+		if repoURL == "" {
+			c.writeError(w, http.StatusBadRequest, "missing_field", "repository.clone_url is required")
+			return
+		}
+
+		slog.Info("Received GitHub push webhook",
+			"repo", payload.Repository.FullName,
+			"branch", branch,
+			"commit", commit)
+
+		result, err := c.gitWebhookService.RequestAnalysis(r.Context(), repoURL, branch, commit)
+		if err != nil {
+			slog.Error("Failed to start analysis from GitHub webhook", "error", err)
 			c.writeError(w, http.StatusInternalServerError, "analysis_failed", err.Error())
 			return
 		}
