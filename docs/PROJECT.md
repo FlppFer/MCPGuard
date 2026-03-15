@@ -2,7 +2,7 @@
 
 ## Overview
 
-MCPGuard is an automated security analysis pipeline for Model Context Protocol (MCP) server implementations. It is the **Go API** component described in the academic paper *"Pipeline Automatizada de Análise de Segurança para Implementações de Model Context Protocol (MCP)"* (Ferreira, Faculdade Impacta de Tecnologia).
+MCPGuard is an automated security analysis pipeline for Model Context Protocol (MCP) server implementations. It is the **Go API** component described in the academic paper *"Pipeline Automatizada de Análise de Segurança para Implementações de Model Context Protocol (MCP)"* (Ferreira, Faculdade Impacta de Tecnologia) — see `docs/articles/MCPGuard.md`.
 
 The system receives analysis requests via GitHub webhooks or direct API calls, clones the target repository, performs static rule-based analysis using tree-sitter AST parsing, and stores findings in S3-compatible object storage. Results are exposed through a REST API and can be consumed by GitHub Actions to comment on Pull Requests.
 
@@ -12,32 +12,41 @@ The system receives analysis requests via GitHub webhooks or direct API calls, c
 
 ## Architecture
 
-MCPGuard follows a layered, service-oriented architecture:
+MCPGuard follows a layered, service-oriented architecture with a clean separation between public interfaces, private implementations, and shared types:
 
 ```
 cmd/api/              → Entrypoint, bootstrap, route registration
 config/               → YAML-based configuration (embedded via go:embed)
+docs/
+  PROJECT.md          → This file — project context & architecture reference
+  RULES_TAXONOMY.md   → Full mapping of 31 attacks to rule IDs
+  articles/
+    MCPGuard.md       → Our academic paper (MCPGuard pipeline)
+    article1-5.pdf    → Base reference articles (see References section)
 internal/
   controller/         → HTTP handlers (chi router)
   middleware/auth/    → Authentication strategies (webhook HMAC, API key)
   model/
     http/             → Request/response DTOs
-    services/         → Service-layer DTOs
+    services/         → Service-layer DTOs (SourceFileDTO, etc.)
     repositories/     → Database entity (GORM model)
   repositories/
     db/               → SQLite persistence (GORM, with in-memory mock)
     obj_storage/      → Object storage (S3 + local filesystem mock)
   service/
+    model/
+      analysis_dtos.go           → Shared types: Finding, AnalysisResult, severity constants
+      rule.go                    → Shared Rule interface
     git_webhook_service.go       → Core orchestration service
     agentic_analysis_service.go  → Placeholder for Python agentic worker
     static_analysis/
-      rule.go                    → Rule interface & global registry
-      finding.go                 → Finding struct & severity constants
-      static_analysis_engine.go  → StaticAnalysisService interface
-      static_analysis_engine_impl.go → Engine implementation
+      service.go                 → Public Service interface + NewService() constructor
+      engine.go                  → Private engine struct + EngineOption functional options
+      rule_registry.go           → Global rule registry (keyed by language)
+      static_analysis_service_test.go → Integration tests for the analysis service
       languages/python/
         parser.go                → tree-sitter Python AST parser
-        rules/                   → 11 rule files covering 31 attack types
+        rules/                   → 11 rule files covering 31 attack types (each with _test.go)
   utils/
     repo_download_utils.go       → Git clone + zip
     file_utils.go                → File walking, extension filtering, zipping
@@ -84,17 +93,21 @@ The `GitWebhookService` drives the full pipeline:
 7. **Update** entity status to `static_done`
 8. **Return** analysis ID immediately (HTTP 202 Accepted)
 
-### 4. Static Analysis Engine (`internal/service/static_analysis/`)
+### 4. Static Analysis (`internal/service/static_analysis/`)
 
-- **Interface:** `StaticAnalysisService` with `Analyze()` and `RunAnalysis()` methods.
-- **Rule registry:** Global map keyed by language string; rules self-register via `init()` functions.
-- **AST parsing:** Uses `go-tree-sitter` with the Python grammar to produce a concrete syntax tree.
-- **Finding model:** Each finding includes `rule_id`, `message`, `file_path`, `line`, `severity`, and `snippet`.
-- **Functional options:** `WithOutputDir(dir)` and `WithPersistence(bool)` configure the engine.
+The static analysis component uses a clean separation between its public interface and private implementation:
+
+- **Public interface** (`service.go`): `Service` interface with a single `RunAnalysis()` method. The `NewService()` constructor accepts functional options and returns a `Service`.
+- **Private implementation** (`engine.go`): `engine` struct implements `Service`. Manages AST parsing, rule evaluation, finding aggregation, and optional result persistence. Configured via `EngineOption` functional options (`WithOutputDir`, `WithPersistence`).
+- **Shared types** (`internal/service/model/`):
+  - `analysis_dtos.go` — `Finding`, `AnalysisResult`, and severity constants (`critical`, `high`, `medium`, `low`, `info`)
+  - `rule.go` — `Rule` interface (`ID()`, `Description()`, `AppliesToLanguage()`, `Evaluate()`)
+- **Rule registry** (`rule_registry.go`): Global `map[string][]model.Rule` keyed by language string. Rules self-register via `init()` functions using `RegisterRule()`.
+- **AST parsing**: Uses `go-tree-sitter` with the Python grammar to produce a concrete syntax tree (`languages/python/parser.go`).
 
 ### 5. Security Rules (31 attack types)
 
-Rules are based on the MCPLib taxonomy (arXiv:2508.12538, Guo et al. 2025) and organized into 11 rule files under `internal/service/static_analysis/languages/python/rules/`:
+Rules are based on the MCPLib taxonomy [1] and organized into 11 rule files under `internal/service/static_analysis/languages/python/rules/`:
 
 | Rule File | Category |
 |-----------|----------|
@@ -113,8 +126,6 @@ Rules are based on the MCPLib taxonomy (arXiv:2508.12538, Guo et al. 2025) and o
 Each rule file has a corresponding `_test.go` file. Test fixtures live in `resources/test/`.
 
 See `docs/RULES_TAXONOMY.md` for the full mapping of all 31 attacks to rule IDs.
-
-**Severity levels:** `critical`, `high`, `medium`, `low`, `info`
 
 ### 6. Persistence
 
@@ -185,16 +196,28 @@ Currently, only Python has active rule-based analysis via tree-sitter AST. Other
 
 ## Not Yet Implemented
 
-- **Agentic Analysis:** The `agentic_analysis_controller.go` and `agentic_analysis_service.go` are stubs. The planned Python-based AI agent worker (described in the article) that performs semantic analysis via LLMs is not yet integrated.
+- **Agentic Analysis:** The `agentic_analysis_controller.go` and `agentic_analysis_service.go` are stubs. The planned Python-based AI agent worker (described in the MCPGuard article) that performs semantic analysis via LLMs is not yet integrated.
 - **RabbitMQ Message Queue:** The article describes a message queue for scalability; the current implementation runs analysis synchronously in goroutines.
 - **GitHub Actions Integration:** The CI/CD feedback loop (posting analysis results as PR comments) is not yet implemented in this codebase.
 - **Docker Containerization:** No Dockerfile or docker-compose is present yet.
+- **Metrics & Observability:** Prometheus + Grafana stack described in the article is not yet integrated.
 - **Multi-language Rules:** Only Python rules exist; the rule registry supports language-keyed expansion.
 
 ---
 
-## References
+## Base Articles & References
 
-- Paper: *"Pipeline Automatizada de Análise de Segurança para Implementações de Model Context Protocol (MCP)"* — Ferreira, F.A.D. (Faculdade Impacta de Tecnologia)
-- Attack Taxonomy: *"Systematic Analysis of MCP Security"* — Guo et al. (arXiv:2508.12538)
-- MCPLib: MCP Attack Library with 31 attack implementations
+The MCPGuard article (`docs/articles/MCPGuard.md`) draws on the following base research articles (converted `.md` versions at repo root, original PDFs under `docs/articles/`):
+
+| # | File | Title | Authors | Key Contribution to MCPGuard |
+|---|------|-------|---------|------------------------------|
+| 1 | `article1.md` / `article1.pdf` | *Systematic Analysis of MCP Security* | Guo, Y. et al. (arXiv:2508.12538) | **Primary reference.** Provides the MCPLib attack taxonomy with 31 attack types in 4 categories (Direct Tool Injection, Indirect Tool Injection, Malicious User Attacks, LLM Inherent Attacks). MCPGuard's 11 rule files and `RULES_TAXONOMY.md` directly implement detection for all 31 attacks. |
+| 2 | `article2.md` / `article2.pdf` | *Towards Understanding Sycophancy in Language Models* | Sharma, M. et al. (Anthropic) | Foundational research on LLM sycophancy — the tendency of AI models to agree with user beliefs over truth. Referenced by article 1 as a core vulnerability that MCP Tool Poisoning Attacks exploit (agents blindly trust tool descriptions). |
+| 3 | `article3.md` / `article3.pdf` | *Model Context Protocol (MCP): Landscape, Security Threats, and Future Research Directions* | Hou, X. et al. (Huazhong Univ.) | Comprehensive MCP landscape survey. Defines the MCP server lifecycle (4 phases, 16 activities) and a threat taxonomy with 4 attacker types and 16 threat scenarios. Informs MCPGuard's architectural understanding of MCP and its broader threat model. |
+| 4 | `article4.md` / `article4.pdf` | *Enterprise-Grade Security for the Model Context Protocol (MCP): Frameworks and Mitigation Strategies* | Narajala, V.S. & Habler, I. (AWS / Intuit) | Proposes enterprise security frameworks using MAESTRO, Zero Trust Architecture, and defense-in-depth for MCP. Provides context for MCPGuard's positioning as a practical tool in the broader MCP security ecosystem. |
+| 5 | `article5.md` / `article5.pdf` | *MCP Security Bench (MSB): Benchmarking Attacks Against Model Context Protocol in LLM Agents* | Zhang, D. et al. (BUPT / UCSB) | First end-to-end MCP security benchmark. Introduces 12 attack types across the full tool-use pipeline (task planning, tool invocation, response handling) with 2,000 attack instances. Complements MCPGuard's static analysis approach with a dynamic evaluation perspective. |
+
+### Additional References
+
+- Anthropic (2024) — *Model Context Protocol Specification*: https://modelcontextprotocol.io/specification
+- Invariant Labs (2024) — *MCP Security Audit: Tool Poisoning Attacks*: https://invariantlabs.ai/blog/mcp-security-audit
