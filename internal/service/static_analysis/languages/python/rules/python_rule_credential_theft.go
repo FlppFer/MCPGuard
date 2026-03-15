@@ -1,7 +1,9 @@
 package rules
 
 import (
-	"regexp"
+	
+	"github.com/FlppFer/MCPGuard/internal/service/model"
+"regexp"
 	"strings"
 
 	"github.com/FlppFer/MCPGuard/internal/service/static_analysis"
@@ -13,7 +15,7 @@ import (
 // Based on MCP Attack Taxonomy: File-Based Injection Attack-Retrieval (III-A1d) and Token Theft (III-C4)
 type CredentialTheftRule struct{}
 
-func NewCredentialTheftRule() static_analysis.Rule {
+func NewCredentialTheftRule() model.Rule {
 	return &CredentialTheftRule{}
 }
 
@@ -111,19 +113,19 @@ var exfiltrationPatterns = []struct {
 	},
 }
 
-func (r *CredentialTheftRule) Evaluate(ast interface{}) ([]static_analysis.Finding, error) {
+func (r *CredentialTheftRule) Evaluate(ast interface{}) ([]model.Finding, error) {
 	py, ok := ast.(*python.PythonAST)
 	if !ok {
 		return nil, nil
 	}
 
-	var findings []static_analysis.Finding
+	var findings []model.Finding
 	r.walkTree(py.Tree.RootNode(), py.Source, &findings)
 
 	return findings, nil
 }
 
-func (r *CredentialTheftRule) walkTree(node *sitter.Node, source []byte, findings *[]static_analysis.Finding) {
+func (r *CredentialTheftRule) walkTree(node *sitter.Node, source []byte, findings *[]model.Finding) {
 	if node == nil {
 		return
 	}
@@ -136,12 +138,12 @@ func (r *CredentialTheftRule) walkTree(node *sitter.Node, source []byte, finding
 
 		for _, p := range sensitiveFilePatterns {
 			if p.pattern.MatchString(text) {
-				*findings = append(*findings, static_analysis.Finding{
+				*findings = append(*findings, model.Finding{
 					RuleID:   r.ID(),
 					Message:  p.description,
 					Line:     int(node.StartPoint().Row) + 1,
 					Snippet:  truncateSnippet(text, 200),
-					Severity: static_analysis.SeverityHigh,
+					Severity: model.SeverityHigh,
 				})
 			}
 		}
@@ -160,12 +162,12 @@ func (r *CredentialTheftRule) walkTree(node *sitter.Node, source []byte, finding
 					argsText := string(source[argsNode.StartByte():argsNode.EndByte()])
 					for _, p := range sensitiveFilePatterns {
 						if p.pattern.MatchString(argsText) {
-							*findings = append(*findings, static_analysis.Finding{
+							*findings = append(*findings, model.Finding{
 								RuleID:   r.ID(),
 								Message:  "File open on sensitive path: " + p.description,
 								Line:     int(node.StartPoint().Row) + 1,
 								Snippet:  truncateSnippet(string(source[node.StartByte():node.EndByte()]), 200),
-								Severity: static_analysis.SeverityCritical,
+								Severity: model.SeverityCritical,
 							})
 						}
 					}
@@ -179,12 +181,12 @@ func (r *CredentialTheftRule) walkTree(node *sitter.Node, source []byte, finding
 					argsText := string(source[argsNode.StartByte():argsNode.EndByte()])
 					for _, p := range sensitiveFilePatterns {
 						if p.pattern.MatchString(argsText) {
-							*findings = append(*findings, static_analysis.Finding{
+							*findings = append(*findings, model.Finding{
 								RuleID:   r.ID(),
 								Message:  "Environment variable access: " + p.description,
 								Line:     int(node.StartPoint().Row) + 1,
 								Snippet:  truncateSnippet(string(source[node.StartByte():node.EndByte()]), 200),
-								Severity: static_analysis.SeverityMedium,
+								Severity: model.SeverityMedium,
 							})
 						}
 					}
@@ -198,12 +200,12 @@ func (r *CredentialTheftRule) walkTree(node *sitter.Node, source []byte, finding
 		text := string(source[node.StartByte():node.EndByte()])
 		for _, p := range exfiltrationPatterns {
 			if p.pattern.MatchString(text) {
-				*findings = append(*findings, static_analysis.Finding{
+				*findings = append(*findings, model.Finding{
 					RuleID:   r.ID(),
 					Message:  p.description,
 					Line:     int(node.StartPoint().Row) + 1,
 					Snippet:  truncateSnippet(text, 200),
-					Severity: static_analysis.SeverityMedium,
+					Severity: model.SeverityMedium,
 				})
 			}
 		}
@@ -218,3 +220,6 @@ func (r *CredentialTheftRule) walkTree(node *sitter.Node, source []byte, finding
 func init() {
 	static_analysis.RegisterRule(static_analysis.LanguagePython, NewCredentialTheftRule())
 }
+
+
+

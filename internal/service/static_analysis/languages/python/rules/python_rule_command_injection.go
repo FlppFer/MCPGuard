@@ -3,6 +3,7 @@ package rules
 import (
 	"regexp"
 
+	"github.com/FlppFer/MCPGuard/internal/service/model"
 	"github.com/FlppFer/MCPGuard/internal/service/static_analysis"
 	"github.com/FlppFer/MCPGuard/internal/service/static_analysis/languages/python"
 	sitter "github.com/smacker/go-tree-sitter"
@@ -12,7 +13,7 @@ import (
 // Based on MCP Attack Taxonomy: Direct Tool Injection Attack - Command Injection (III-A1g)
 type CommandInjectionRule struct{}
 
-func NewCommandInjectionRule() static_analysis.Rule {
+func NewCommandInjectionRule() model.Rule {
 	return &CommandInjectionRule{}
 }
 
@@ -81,19 +82,19 @@ var shellInjectionPatterns = []struct {
 	},
 }
 
-func (r *CommandInjectionRule) Evaluate(ast interface{}) ([]static_analysis.Finding, error) {
+func (r *CommandInjectionRule) Evaluate(ast interface{}) ([]model.Finding, error) {
 	py, ok := ast.(*python.PythonAST)
 	if !ok {
 		return nil, nil
 	}
 
-	var findings []static_analysis.Finding
+	var findings []model.Finding
 	r.walkTree(py.Tree.RootNode(), py.Source, &findings)
 
 	return findings, nil
 }
 
-func (r *CommandInjectionRule) walkTree(node *sitter.Node, source []byte, findings *[]static_analysis.Finding) {
+func (r *CommandInjectionRule) walkTree(node *sitter.Node, source []byte, findings *[]model.Finding) {
 	if node == nil {
 		return
 	}
@@ -107,12 +108,12 @@ func (r *CommandInjectionRule) walkTree(node *sitter.Node, source []byte, findin
 			funcName := string(source[funcNode.StartByte():funcNode.EndByte()])
 
 			if desc, isDangerous := dangerousFunctions[funcName]; isDangerous {
-				severity := static_analysis.SeverityHigh
+				severity := model.SeverityHigh
 				if funcName == "eval" || funcName == "exec" {
-					severity = static_analysis.SeverityCritical
+					severity = model.SeverityCritical
 				}
 
-				*findings = append(*findings, static_analysis.Finding{
+				*findings = append(*findings, model.Finding{
 					RuleID:   r.ID(),
 					Message:  desc + " - " + funcName + "()",
 					Line:     int(node.StartPoint().Row) + 1,
@@ -127,12 +128,12 @@ func (r *CommandInjectionRule) walkTree(node *sitter.Node, source []byte, findin
 				if argsNode != nil {
 					argsText := string(source[argsNode.StartByte():argsNode.EndByte()])
 					if regexp.MustCompile(`shell\s*=\s*True`).MatchString(argsText) {
-						*findings = append(*findings, static_analysis.Finding{
+						*findings = append(*findings, model.Finding{
 							RuleID:   r.ID(),
 							Message:  "Subprocess with shell=True is vulnerable to command injection",
 							Line:     int(node.StartPoint().Row) + 1,
 							Snippet:  truncateSnippet(string(source[node.StartByte():node.EndByte()]), 200),
-							Severity: static_analysis.SeverityCritical,
+							Severity: model.SeverityCritical,
 						})
 					}
 				}
@@ -145,12 +146,12 @@ func (r *CommandInjectionRule) walkTree(node *sitter.Node, source []byte, findin
 		text := string(source[node.StartByte():node.EndByte()])
 		for _, p := range shellInjectionPatterns {
 			if p.pattern.MatchString(text) {
-				*findings = append(*findings, static_analysis.Finding{
+				*findings = append(*findings, model.Finding{
 					RuleID:   r.ID(),
 					Message:  p.description,
 					Line:     int(node.StartPoint().Row) + 1,
 					Snippet:  truncateSnippet(text, 200),
-					Severity: static_analysis.SeverityHigh,
+					Severity: model.SeverityHigh,
 				})
 			}
 		}
@@ -165,3 +166,4 @@ func (r *CommandInjectionRule) walkTree(node *sitter.Node, source []byte, findin
 func init() {
 	static_analysis.RegisterRule(static_analysis.LanguagePython, NewCommandInjectionRule())
 }
+

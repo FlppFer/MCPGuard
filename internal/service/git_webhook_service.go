@@ -25,15 +25,15 @@ type GitWebhookService interface {
 }
 
 type gitWebhookServiceImpl struct {
-	dbRepo         db.DatabaseClient                     // SQLite GORM implementation
-	storageRepo    obj_storage.StorageRepository         // S3/Local obj_storage implementation
-	staticAnalyzer static_analysis.StaticAnalysisService // Your static analysis engine
+	dbRepo         db.DatabaseClient             // SQLite GORM implementation
+	storageRepo    obj_storage.StorageRepository // S3/Local obj_storage implementation
+	staticAnalyzer static_analysis.Service       // Static analysis service
 }
 
 func NewGitWebhookService(
 	dbRepo db.DatabaseClient,
 	storageRepo obj_storage.StorageRepository,
-	staticAnalyzer static_analysis.StaticAnalysisService,
+	staticAnalyzer static_analysis.Service,
 ) GitWebhookService {
 
 	return &gitWebhookServiceImpl{

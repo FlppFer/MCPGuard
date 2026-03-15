@@ -1,7 +1,9 @@
 package rules
 
 import (
-	"regexp"
+	
+	"github.com/FlppFer/MCPGuard/internal/service/model"
+"regexp"
 
 	"github.com/FlppFer/MCPGuard/internal/service/static_analysis"
 	"github.com/FlppFer/MCPGuard/internal/service/static_analysis/languages/python"
@@ -18,7 +20,7 @@ import (
 // - III-C6: Installer Spoofing
 type MaliciousUserRule struct{}
 
-func NewMaliciousUserRule() static_analysis.Rule {
+func NewMaliciousUserRule() model.Rule {
 	return &MaliciousUserRule{}
 }
 
@@ -45,25 +47,25 @@ var maliciousUserPatterns = []struct {
 	{
 		pattern:     regexp.MustCompile(`(?i)(register|add|create)_(tool|function|handler)\s*\(`),
 		description: "Dynamic tool registration - verify authorization",
-		severity:    static_analysis.SeverityMedium,
+		severity:    model.SeverityMedium,
 		attackID:    "TOOL-REGISTRATION",
 	},
 	{
 		pattern:     regexp.MustCompile(`(?i)@(tool|mcp\.tool|register)\s*\(`),
 		description: "Tool decorator - verify tool definition safety",
-		severity:    static_analysis.SeverityLow,
+		severity:    model.SeverityLow,
 		attackID:    "TOOL-REGISTRATION",
 	},
 	{
 		pattern:     regexp.MustCompile(`(?i)tools?\s*\[\s*['"]\w+['"]\s*\]\s*=`),
 		description: "Direct tool registry modification",
-		severity:    static_analysis.SeverityHigh,
+		severity:    model.SeverityHigh,
 		attackID:    "TOOL-REGISTRATION",
 	},
 	{
 		pattern:     regexp.MustCompile(`(?i)(tool_registry|handlers?|endpoints?)\s*\.\s*(update|append|extend)\s*\(`),
 		description: "Tool registry bulk modification",
-		severity:    static_analysis.SeverityHigh,
+		severity:    model.SeverityHigh,
 		attackID:    "TOOL-REGISTRATION",
 	},
 
@@ -71,37 +73,37 @@ var maliciousUserPatterns = []struct {
 	{
 		pattern:     regexp.MustCompile(`(?i)=\s*cmd\s*\|\s*['"]`),
 		description: "CSV formula injection pattern",
-		severity:    static_analysis.SeverityCritical,
+		severity:    model.SeverityCritical,
 		attackID:    "DATA-INJECTION",
 	},
 	{
 		pattern:     regexp.MustCompile(`(?i)=\s*(HYPERLINK|IMPORTDATA|IMPORTXML)\s*\(`),
 		description: "Spreadsheet formula injection",
-		severity:    static_analysis.SeverityCritical,
+		severity:    model.SeverityCritical,
 		attackID:    "DATA-INJECTION",
 	},
 	{
 		pattern:     regexp.MustCompile(`(?i)\\x[0-9a-f]{2}`),
 		description: "Hex-encoded data - potential filter bypass",
-		severity:    static_analysis.SeverityMedium,
+		severity:    model.SeverityMedium,
 		attackID:    "DATA-INJECTION",
 	},
 	{
 		pattern:     regexp.MustCompile(`(?i)json\.(loads?|dumps?)\s*\([^)]*\)\s*\[`),
 		description: "JSON parsing with immediate access - verify input validation",
-		severity:    static_analysis.SeverityLow,
+		severity:    model.SeverityLow,
 		attackID:    "DATA-INJECTION",
 	},
 	{
 		pattern:     regexp.MustCompile(`(?i)xml\.etree\.ElementTree\.(parse|fromstring)`),
 		description: "XML parsing - potential XXE vulnerability",
-		severity:    static_analysis.SeverityHigh,
+		severity:    model.SeverityHigh,
 		attackID:    "DATA-INJECTION",
 	},
 	{
 		pattern:     regexp.MustCompile(`(?i)lxml\.etree\.(parse|fromstring|XML)`),
 		description: "lxml parsing - verify XXE protection",
-		severity:    static_analysis.SeverityHigh,
+		severity:    model.SeverityHigh,
 		attackID:    "DATA-INJECTION",
 	},
 
@@ -109,31 +111,31 @@ var maliciousUserPatterns = []struct {
 	{
 		pattern:     regexp.MustCompile(`(?i)(oauth|bearer|jwt|access)[-_]?token`),
 		description: "Token handling - verify secure storage",
-		severity:    static_analysis.SeverityMedium,
+		severity:    model.SeverityMedium,
 		attackID:    "TOKEN-THEFT",
 	},
 	{
 		pattern:     regexp.MustCompile(`(?i)authorization\s*:\s*['"]?(bearer|basic)\s+`),
 		description: "Authorization header construction",
-		severity:    static_analysis.SeverityMedium,
+		severity:    model.SeverityMedium,
 		attackID:    "TOKEN-THEFT",
 	},
 	{
 		pattern:     regexp.MustCompile(`(?i)(gmail|github|gitlab|slack|discord)\.(api|client|oauth)`),
 		description: "Third-party service API access",
-		severity:    static_analysis.SeverityMedium,
+		severity:    model.SeverityMedium,
 		attackID:    "TOKEN-THEFT",
 	},
 	{
 		pattern:     regexp.MustCompile(`(?i)GET\s+/user/(email|profile|token|credentials)`),
 		description: "User data endpoint access pattern",
-		severity:    static_analysis.SeverityHigh,
+		severity:    model.SeverityHigh,
 		attackID:    "TOKEN-THEFT",
 	},
 	{
 		pattern:     regexp.MustCompile(`(?i)POST\s+/api/(commit|push|deploy|release)`),
 		description: "Code modification endpoint access",
-		severity:    static_analysis.SeverityHigh,
+		severity:    model.SeverityHigh,
 		attackID:    "TOKEN-THEFT",
 	},
 
@@ -141,37 +143,37 @@ var maliciousUserPatterns = []struct {
 	{
 		pattern:     regexp.MustCompile(`(?i)(File\s+not\s+found|No\s+such\s+file):\s*/`),
 		description: "Path disclosure in error message",
-		severity:    static_analysis.SeverityMedium,
+		severity:    model.SeverityMedium,
 		attackID:    "CODE-LEAKAGE",
 	},
 	{
 		pattern:     regexp.MustCompile(`(?i)traceback\.(print_exc|format_exc)`),
 		description: "Traceback exposure - potential code leakage",
-		severity:    static_analysis.SeverityMedium,
+		severity:    model.SeverityMedium,
 		attackID:    "CODE-LEAKAGE",
 	},
 	{
 		pattern:     regexp.MustCompile(`(?i)debug\s*=\s*True`),
 		description: "Debug mode enabled - information disclosure risk",
-		severity:    static_analysis.SeverityHigh,
+		severity:    model.SeverityHigh,
 		attackID:    "CODE-LEAKAGE",
 	},
 	{
 		pattern:     regexp.MustCompile(`(?i)__file__|__name__|__module__`),
 		description: "Module metadata access - path disclosure risk",
-		severity:    static_analysis.SeverityLow,
+		severity:    model.SeverityLow,
 		attackID:    "CODE-LEAKAGE",
 	},
 	{
 		pattern:     regexp.MustCompile(`(?i)inspect\.(getsource|getfile|getmodule)`),
 		description: "Source code inspection",
-		severity:    static_analysis.SeverityHigh,
+		severity:    model.SeverityHigh,
 		attackID:    "CODE-LEAKAGE",
 	},
 	{
 		pattern:     regexp.MustCompile(`(?i)GET\s+/(debug|api/list|source|code)\?`),
 		description: "Debug/source endpoint access pattern",
-		severity:    static_analysis.SeverityHigh,
+		severity:    model.SeverityHigh,
 		attackID:    "CODE-LEAKAGE",
 	},
 
@@ -179,48 +181,48 @@ var maliciousUserPatterns = []struct {
 	{
 		pattern:     regexp.MustCompile(`(?i)(mcp-get|mcp-installer|mcpinstall)`),
 		description: "MCP installer reference - verify authenticity",
-		severity:    static_analysis.SeverityMedium,
+		severity:    model.SeverityMedium,
 		attackID:    "INSTALLER-SPOOFING",
 	},
 	{
 		pattern:     regexp.MustCompile(`(?i)pip\s+install\s+--index-url\s+http://`),
 		description: "Insecure pip index URL",
-		severity:    static_analysis.SeverityCritical,
+		severity:    model.SeverityCritical,
 		attackID:    "INSTALLER-SPOOFING",
 	},
 	{
 		pattern:     regexp.MustCompile(`(?i)pip\s+install\s+--trusted-host`),
 		description: "Pip trusted host override - potential MITM",
-		severity:    static_analysis.SeverityHigh,
+		severity:    model.SeverityHigh,
 		attackID:    "INSTALLER-SPOOFING",
 	},
 	{
 		pattern:     regexp.MustCompile(`(?i)(setup\.py|pyproject\.toml).*install`),
 		description: "Package installation from source - verify integrity",
-		severity:    static_analysis.SeverityMedium,
+		severity:    model.SeverityMedium,
 		attackID:    "INSTALLER-SPOOFING",
 	},
 	{
 		pattern:     regexp.MustCompile(`(?i)subprocess.*pip\s+install`),
 		description: "Dynamic pip installation - supply chain risk",
-		severity:    static_analysis.SeverityHigh,
+		severity:    model.SeverityHigh,
 		attackID:    "INSTALLER-SPOOFING",
 	},
 }
 
-func (r *MaliciousUserRule) Evaluate(ast interface{}) ([]static_analysis.Finding, error) {
+func (r *MaliciousUserRule) Evaluate(ast interface{}) ([]model.Finding, error) {
 	py, ok := ast.(*python.PythonAST)
 	if !ok {
 		return nil, nil
 	}
 
-	var findings []static_analysis.Finding
+	var findings []model.Finding
 	r.walkTree(py.Tree.RootNode(), py.Source, &findings)
 
 	return findings, nil
 }
 
-func (r *MaliciousUserRule) walkTree(node *sitter.Node, source []byte, findings *[]static_analysis.Finding) {
+func (r *MaliciousUserRule) walkTree(node *sitter.Node, source []byte, findings *[]model.Finding) {
 	if node == nil {
 		return
 	}
@@ -233,7 +235,7 @@ func (r *MaliciousUserRule) walkTree(node *sitter.Node, source []byte, findings 
 
 		for _, p := range maliciousUserPatterns {
 			if p.pattern.MatchString(text) {
-				*findings = append(*findings, static_analysis.Finding{
+				*findings = append(*findings, model.Finding{
 					RuleID:   r.ID() + "-" + p.attackID,
 					Message:  p.description,
 					Line:     int(node.StartPoint().Row) + 1,
@@ -253,3 +255,6 @@ func (r *MaliciousUserRule) walkTree(node *sitter.Node, source []byte, findings 
 func init() {
 	static_analysis.RegisterRule(static_analysis.LanguagePython, NewMaliciousUserRule())
 }
+
+
+

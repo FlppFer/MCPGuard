@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/FlppFer/MCPGuard/internal/model/services"
+	"github.com/FlppFer/MCPGuard/internal/service/model"
 	sae "github.com/FlppFer/MCPGuard/internal/service/static_analysis"
 
 	_ "github.com/FlppFer/MCPGuard/internal/service/static_analysis/languages/python/rules"
@@ -14,28 +15,28 @@ import (
 
 const testDataDir = "../../../resources/test"
 
-// newTestEngine creates an engine configured for testing (no persistence by default)
-func newTestEngine(t *testing.T) *sae.Engine {
+// newTestEngine creates a service configured for testing (no persistence by default)
+func newTestEngine(t *testing.T) sae.Service {
 	t.Helper()
-	return sae.NewStaticAnalyzerEngine(sae.WithPersistence(false))
+	return sae.NewService(sae.WithPersistence(false))
 }
 
-// newTestEngineWithTempDir creates an engine that persists to a temp directory
-// Returns the engine and a cleanup function
-func newTestEngineWithTempDir(t *testing.T) (*sae.Engine, func()) {
+// newTestEngineWithTempDir creates a service that persists to a temp directory
+// Returns the service and a cleanup function
+func newTestEngineWithTempDir(t *testing.T) (sae.Service, func()) {
 	t.Helper()
 	tmpDir, err := os.MkdirTemp("", "mcpguard-test-*")
 	if err != nil {
 		t.Fatalf("Failed to create temp dir: %v", err)
 	}
-	engine := sae.NewStaticAnalyzerEngine(
+	service := sae.NewService(
 		sae.WithOutputDir(tmpDir),
 		sae.WithPersistence(true),
 	)
 	cleanup := func() {
 		os.RemoveAll(tmpDir)
 	}
-	return engine, cleanup
+	return service, cleanup
 }
 
 func loadTestFile(t *testing.T, filename string) services.SourceFileDTO {
@@ -70,7 +71,7 @@ type ExpectedFinding struct {
 }
 
 // assertFinding validates a Finding against expected values
-func assertFinding(t *testing.T, actual sae.Finding, expected ExpectedFinding) {
+func assertFinding(t *testing.T, actual model.Finding, expected ExpectedFinding) {
 	t.Helper()
 
 	// RuleID checks
@@ -123,7 +124,7 @@ func assertFinding(t *testing.T, actual sae.Finding, expected ExpectedFinding) {
 }
 
 // assertFindingComplete validates that all fields of a Finding are populated
-func assertFindingComplete(t *testing.T, f sae.Finding, idx int) {
+func assertFindingComplete(t *testing.T, f model.Finding, idx int) {
 	t.Helper()
 	if f.RuleID == "" {
 		t.Errorf("Finding[%d]: RuleID is empty", idx)
@@ -144,8 +145,8 @@ func assertFindingComplete(t *testing.T, f sae.Finding, idx int) {
 		t.Errorf("Finding[%d]: Snippet is empty", idx)
 	}
 	validSeverities := map[string]bool{
-		sae.SeverityInfo: true, sae.SeverityLow: true,
-		sae.SeverityMedium: true, sae.SeverityHigh: true, sae.SeverityCritical: true,
+		model.SeverityInfo: true, model.SeverityLow: true,
+		model.SeverityMedium: true, model.SeverityHigh: true, model.SeverityCritical: true,
 	}
 	if !validSeverities[f.Severity] {
 		t.Errorf("Finding[%d]: Invalid severity '%s'", idx, f.Severity)
@@ -153,7 +154,7 @@ func assertFindingComplete(t *testing.T, f sae.Finding, idx int) {
 }
 
 // findFindingMatching finds a finding that matches all non-empty expected fields
-func findFindingMatching(findings []sae.Finding, expected ExpectedFinding) *sae.Finding {
+func findFindingMatching(findings []model.Finding, expected ExpectedFinding) *model.Finding {
 	for _, f := range findings {
 		if expected.RuleIDContains != "" && !containsIgnoreCase(f.RuleID, expected.RuleIDContains) {
 			continue
@@ -178,14 +179,14 @@ func findFindingMatching(findings []sae.Finding, expected ExpectedFinding) *sae.
 	return nil
 }
 
-func assertFindingsComplete(t *testing.T, findings []sae.Finding) {
+func assertFindingsComplete(t *testing.T, findings []model.Finding) {
 	t.Helper()
 	for i, f := range findings {
 		assertFindingComplete(t, f, i)
 	}
 }
 
-func findFindingByPattern(findings []sae.Finding, ruleContains, msgContains string) *sae.Finding {
+func findFindingByPattern(findings []model.Finding, ruleContains, msgContains string) *model.Finding {
 	for _, f := range findings {
 		ruleMatch := ruleContains == "" || containsIgnoreCase(f.RuleID, ruleContains)
 		msgMatch := msgContains == "" || containsIgnoreCase(f.Message, msgContains)
@@ -224,7 +225,7 @@ func TestRunStaticAnalysis_CommandInjection(t *testing.T) {
 				FilePathContains: "test_command_injection.py",
 				LineMin:          9,
 				LineMax:          15,
-				Severity:         sae.SeverityHigh,
+				Severity:         model.SeverityHigh,
 				SnippetContains:  "system",
 			},
 		},
@@ -247,7 +248,7 @@ func TestRunStaticAnalysis_CommandInjection(t *testing.T) {
 				FilePathContains: "test_command_injection.py",
 				LineMin:          22,
 				LineMax:          25,
-				Severity:         sae.SeverityCritical,
+				Severity:         model.SeverityCritical,
 				SnippetContains:  "eval",
 			},
 		},
@@ -259,7 +260,7 @@ func TestRunStaticAnalysis_CommandInjection(t *testing.T) {
 				FilePathContains: "test_command_injection.py",
 				LineMin:          22,
 				LineMax:          25,
-				Severity:         sae.SeverityCritical,
+				Severity:         model.SeverityCritical,
 				SnippetContains:  "exec",
 			},
 		},
@@ -393,7 +394,7 @@ func TestRunStaticAnalysis_FileOperations(t *testing.T) {
 				RuleIDContains:   "DTI-002",
 				FilePathContains: "test_file_operations.py",
 				SnippetContains:  "rmtree",
-				Severity:         sae.SeverityCritical,
+				Severity:         model.SeverityCritical,
 			},
 		},
 		{
@@ -457,7 +458,7 @@ func TestRunStaticAnalysis_RemoteAttacks(t *testing.T) {
 				RuleIDContains:   "DTI-003",
 				FilePathContains: "test_remote_attacks.py",
 				SnippetContains:  "pty",
-				Severity:         sae.SeverityCritical,
+				Severity:         model.SeverityCritical,
 			},
 		},
 		{
@@ -466,7 +467,7 @@ func TestRunStaticAnalysis_RemoteAttacks(t *testing.T) {
 				RuleIDContains:   "DTI",
 				FilePathContains: "test_remote_attacks.py",
 				SnippetContains:  "eval",
-				Severity:         sae.SeverityCritical,
+				Severity:         model.SeverityCritical,
 			},
 		},
 		{
@@ -475,7 +476,7 @@ func TestRunStaticAnalysis_RemoteAttacks(t *testing.T) {
 				RuleIDContains:   "DTI",
 				FilePathContains: "test_remote_attacks.py",
 				SnippetContains:  "exec",
-				Severity:         sae.SeverityCritical,
+				Severity:         model.SeverityCritical,
 			},
 		},
 	}
@@ -521,7 +522,7 @@ func TestRunStaticAnalysis_ToolPoisoning(t *testing.T) {
 				RuleIDContains:   "DTI-001",
 				FilePathContains: "test_tool_poisoning.py",
 				SnippetContains:  "__doc__",
-				Severity:         sae.SeverityCritical,
+				Severity:         model.SeverityCritical,
 			},
 		},
 		{
@@ -574,7 +575,7 @@ func TestRunStaticAnalysis_IndirectInjection(t *testing.T) {
 	assertFindingsComplete(t, result.Findings)
 
 	pickleFinding := findFindingByPattern(result.Findings, "", "pickle")
-	if pickleFinding != nil && pickleFinding.Severity != sae.SeverityCritical {
+	if pickleFinding != nil && pickleFinding.Severity != model.SeverityCritical {
 		t.Errorf("pickle finding should be critical, got %s", pickleFinding.Severity)
 	}
 
@@ -615,7 +616,7 @@ func TestRunStaticAnalysis_PrivilegeEscalation(t *testing.T) {
 
 	sudoFinding := findFindingByPattern(result.Findings, "", "sudo")
 	if sudoFinding != nil {
-		if sudoFinding.Severity != sae.SeverityCritical {
+		if sudoFinding.Severity != model.SeverityCritical {
 			t.Errorf("sudo finding should be critical, got %s", sudoFinding.Severity)
 		}
 		if !containsIgnoreCase(sudoFinding.Snippet, "sudo") {
@@ -677,7 +678,7 @@ func TestRunStaticAnalysis_ContextPoisoning(t *testing.T) {
 
 	globalsFinding := findFindingByPattern(result.Findings, "", "globals")
 	if globalsFinding != nil {
-		if globalsFinding.Severity != sae.SeverityCritical {
+		if globalsFinding.Severity != model.SeverityCritical {
 			t.Errorf("globals finding should be critical, got %s", globalsFinding.Severity)
 		}
 	}
@@ -751,10 +752,10 @@ func TestRunStaticAnalysis_AllFiles_ComprehensiveValidation(t *testing.T) {
 
 	t.Logf("Total findings: %d", len(result.Findings))
 	t.Logf("By severity: critical=%d, high=%d, medium=%d, low=%d",
-		severityCounts[sae.SeverityCritical], severityCounts[sae.SeverityHigh],
-		severityCounts[sae.SeverityMedium], severityCounts[sae.SeverityLow])
+		severityCounts[model.SeverityCritical], severityCounts[model.SeverityHigh],
+		severityCounts[model.SeverityMedium], severityCounts[model.SeverityLow])
 
-	if severityCounts[sae.SeverityCritical] == 0 {
+	if severityCounts[model.SeverityCritical] == 0 {
 		t.Error("Expected at least some critical findings")
 	}
 }
@@ -766,7 +767,7 @@ func TestRunStaticAnalysis_ContextCancellation(t *testing.T) {
 
 	files := []services.SourceFileDTO{loadTestFile(t, "test_command_injection.py")}
 
-	err := engine.RunStaticAnalysis(ctx, "test-cancelled", files)
+	_, err := engine.RunAnalysis(ctx, "test-cancelled", files)
 	if err == nil {
 		t.Error("Expected error due to cancelled context")
 	}

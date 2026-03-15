@@ -1,7 +1,9 @@
 package rules
 
 import (
-	"regexp"
+	
+	"github.com/FlppFer/MCPGuard/internal/service/model"
+"regexp"
 
 	"github.com/FlppFer/MCPGuard/internal/service/static_analysis"
 	"github.com/FlppFer/MCPGuard/internal/service/static_analysis/languages/python"
@@ -12,7 +14,7 @@ import (
 // Based on MCP Attack Taxonomy: Malicious User Attack (III-C2, III-C7)
 type PrivilegeEscalationRule struct{}
 
-func NewPrivilegeEscalationRule() static_analysis.Rule {
+func NewPrivilegeEscalationRule() model.Rule {
 	return &PrivilegeEscalationRule{}
 }
 
@@ -38,101 +40,101 @@ var privilegeEscalationPatterns = []struct {
 	{
 		pattern:     regexp.MustCompile(`(?i)(sudo|su\s+-|runas|doas)\s+`),
 		description: "Privilege elevation command detected",
-		severity:    static_analysis.SeverityCritical,
+		severity:    model.SeverityCritical,
 	},
 	{
 		pattern:     regexp.MustCompile(`(?i)setuid|setgid|seteuid|setegid`),
 		description: "UID/GID manipulation detected",
-		severity:    static_analysis.SeverityCritical,
+		severity:    model.SeverityCritical,
 	},
 	{
 		pattern:     regexp.MustCompile(`(?i)os\.setuid|os\.setgid|os\.seteuid|os\.setegid`),
 		description: "Python UID/GID manipulation",
-		severity:    static_analysis.SeverityCritical,
+		severity:    model.SeverityCritical,
 	},
 
 	// Sandbox escape patterns
 	{
 		pattern:     regexp.MustCompile(`(?i)ctypes\.CDLL|ctypes\.cdll`),
 		description: "Native library loading - potential sandbox escape",
-		severity:    static_analysis.SeverityHigh,
+		severity:    model.SeverityHigh,
 	},
 	{
 		pattern:     regexp.MustCompile(`(?i)cffi\.FFI`),
 		description: "CFFI usage - potential sandbox escape via native code",
-		severity:    static_analysis.SeverityHigh,
+		severity:    model.SeverityHigh,
 	},
 	{
 		pattern:     regexp.MustCompile(`(?i)/proc/(self|[0-9]+)/(mem|maps|fd)`),
 		description: "Process memory access - potential sandbox escape",
-		severity:    static_analysis.SeverityCritical,
+		severity:    model.SeverityCritical,
 	},
 	{
 		pattern:     regexp.MustCompile(`(?i)ptrace|process_vm_readv|process_vm_writev`),
 		description: "Process tracing/memory access - sandbox escape vector",
-		severity:    static_analysis.SeverityCritical,
+		severity:    model.SeverityCritical,
 	},
 
 	// Container/virtualization escape
 	{
 		pattern:     regexp.MustCompile(`(?i)/var/run/docker\.sock`),
 		description: "Docker socket access - container escape vector",
-		severity:    static_analysis.SeverityCritical,
+		severity:    model.SeverityCritical,
 	},
 	{
 		pattern:     regexp.MustCompile(`(?i)\.dockerenv|/proc/1/cgroup`),
 		description: "Container detection - may be used for escape attempts",
-		severity:    static_analysis.SeverityMedium,
+		severity:    model.SeverityMedium,
 	},
 	{
 		pattern:     regexp.MustCompile(`(?i)nsenter|unshare|setns`),
 		description: "Namespace manipulation - container escape vector",
-		severity:    static_analysis.SeverityCritical,
+		severity:    model.SeverityCritical,
 	},
 
 	// File system escape
 	{
 		pattern:     regexp.MustCompile(`(?i)\.\./\.\./|\.\.\\\.\.\\`),
 		description: "Path traversal pattern - potential sandbox escape",
-		severity:    static_analysis.SeverityHigh,
+		severity:    model.SeverityHigh,
 	},
 	{
 		pattern:     regexp.MustCompile(`(?i)os\.chroot|chroot\s+`),
 		description: "Chroot manipulation - sandbox escape attempt",
-		severity:    static_analysis.SeverityCritical,
+		severity:    model.SeverityCritical,
 	},
 	{
 		pattern:     regexp.MustCompile(`(?i)mount\s+-o\s+bind|bindfs`),
 		description: "Bind mount - potential sandbox escape",
-		severity:    static_analysis.SeverityHigh,
+		severity:    model.SeverityHigh,
 	},
 
 	// Capability manipulation
 	{
 		pattern:     regexp.MustCompile(`(?i)cap_set|capset|setcap|getcap`),
 		description: "Linux capability manipulation",
-		severity:    static_analysis.SeverityHigh,
+		severity:    model.SeverityHigh,
 	},
 
 	// Kernel module loading
 	{
 		pattern:     regexp.MustCompile(`(?i)insmod|modprobe|rmmod|init_module`),
 		description: "Kernel module manipulation - critical privilege escalation",
-		severity:    static_analysis.SeverityCritical,
+		severity:    model.SeverityCritical,
 	},
 
 	// Cron/scheduled task manipulation
 	{
 		pattern:     regexp.MustCompile(`(?i)/etc/cron|crontab\s+-|schtasks`),
 		description: "Scheduled task manipulation - persistence mechanism",
-		severity:    static_analysis.SeverityHigh,
+		severity:    model.SeverityHigh,
 	},
 
 	// Service manipulation
 	{
 		pattern:     regexp.MustCompile(`(?i)systemctl\s+(enable|start|restart)|service\s+\w+\s+(start|restart)`),
 		description: "System service manipulation",
-		severity:    static_analysis.SeverityHigh,
+		severity:    model.SeverityHigh,
 	},
 }
 
@@ -147,19 +149,19 @@ var dangerousPrivilegeImports = map[string]string{
 	"spwd":     "Shadow password access",
 }
 
-func (r *PrivilegeEscalationRule) Evaluate(ast interface{}) ([]static_analysis.Finding, error) {
+func (r *PrivilegeEscalationRule) Evaluate(ast interface{}) ([]model.Finding, error) {
 	py, ok := ast.(*python.PythonAST)
 	if !ok {
 		return nil, nil
 	}
 
-	var findings []static_analysis.Finding
+	var findings []model.Finding
 	r.walkTree(py.Tree.RootNode(), py.Source, &findings)
 
 	return findings, nil
 }
 
-func (r *PrivilegeEscalationRule) walkTree(node *sitter.Node, source []byte, findings *[]static_analysis.Finding) {
+func (r *PrivilegeEscalationRule) walkTree(node *sitter.Node, source []byte, findings *[]model.Finding) {
 	if node == nil {
 		return
 	}
@@ -171,12 +173,12 @@ func (r *PrivilegeEscalationRule) walkTree(node *sitter.Node, source []byte, fin
 		text := string(source[node.StartByte():node.EndByte()])
 		for module, desc := range dangerousPrivilegeImports {
 			if regexp.MustCompile(`(?i)\b` + module + `\b`).MatchString(text) {
-				*findings = append(*findings, static_analysis.Finding{
+				*findings = append(*findings, model.Finding{
 					RuleID:   r.ID(),
 					Message:  "Import of " + module + ": " + desc,
 					Line:     int(node.StartPoint().Row) + 1,
 					Snippet:  truncateSnippet(text, 200),
-					Severity: static_analysis.SeverityMedium,
+					Severity: model.SeverityMedium,
 				})
 			}
 		}
@@ -188,7 +190,7 @@ func (r *PrivilegeEscalationRule) walkTree(node *sitter.Node, source []byte, fin
 
 		for _, p := range privilegeEscalationPatterns {
 			if p.pattern.MatchString(text) {
-				*findings = append(*findings, static_analysis.Finding{
+				*findings = append(*findings, model.Finding{
 					RuleID:   r.ID(),
 					Message:  p.description,
 					Line:     int(node.StartPoint().Row) + 1,
@@ -208,3 +210,6 @@ func (r *PrivilegeEscalationRule) walkTree(node *sitter.Node, source []byte, fin
 func init() {
 	static_analysis.RegisterRule(static_analysis.LanguagePython, NewPrivilegeEscalationRule())
 }
+
+
+

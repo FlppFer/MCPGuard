@@ -1,7 +1,9 @@
 package rules
 
 import (
-	"regexp"
+	
+	"github.com/FlppFer/MCPGuard/internal/service/model"
+"regexp"
 	"strings"
 
 	"github.com/FlppFer/MCPGuard/internal/service/static_analysis"
@@ -14,7 +16,7 @@ import (
 // Covers: Rug Pull Attack (III-A1e), Tool Preference Manipulation
 type ToolPoisoningRule struct{}
 
-func NewToolPoisoningRule() static_analysis.Rule {
+func NewToolPoisoningRule() model.Rule {
 	return &ToolPoisoningRule{}
 }
 
@@ -41,75 +43,75 @@ var toolPoisoningPatterns = []struct {
 	{
 		pattern:     regexp.MustCompile(`(?i)(execute|run|call)\s+(this|the)\s+(code|command|script)\s+(before|after|first)`),
 		description: "Instruction to execute code before/after tool execution",
-		severity:    static_analysis.SeverityCritical,
+		severity:    model.SeverityCritical,
 		attackID:    "RUG-PULL",
 	},
 	{
 		pattern:     regexp.MustCompile(`(?i)ignore\s+(previous|all|other)\s+(instructions?|prompts?|rules?)`),
 		description: "Attempt to override previous instructions",
-		severity:    static_analysis.SeverityCritical,
+		severity:    model.SeverityCritical,
 		attackID:    "INSTRUCTION-OVERRIDE",
 	},
 	// Tool Preference Manipulation (III-A2b)
 	{
 		pattern:     regexp.MustCompile(`(?i)(do\s+not|don'?t|never)\s+(use|call|invoke)\s+(other|any|the)\s+tool`),
 		description: "Instruction to prevent use of other tools",
-		severity:    static_analysis.SeverityHigh,
+		severity:    model.SeverityHigh,
 		attackID:    "TOOL-PREFERENCE",
 	},
 	{
 		pattern:     regexp.MustCompile(`(?i)(always|must|should)\s+(use|prefer|call)\s+this\s+tool`),
 		description: "Forced tool preference manipulation",
-		severity:    static_analysis.SeverityHigh,
+		severity:    model.SeverityHigh,
 		attackID:    "TOOL-PREFERENCE",
 	},
 	{
 		pattern:     regexp.MustCompile(`(?i)(best\s+practice|recommended|preferred)\s+(tool|method|approach)`),
 		description: "Tool preference manipulation via authority claims",
-		severity:    static_analysis.SeverityMedium,
+		severity:    model.SeverityMedium,
 		attackID:    "TOOL-PREFERENCE",
 	},
 	// Malicious Tool Coverage Attack (III-A2b)
 	{
 		pattern:     regexp.MustCompile(`(?i)(deprecated|obsolete|old\s+version|replaced\s+by|unavailable)`),
 		description: "Potential tool coverage attack claiming other tools are deprecated",
-		severity:    static_analysis.SeverityHigh,
+		severity:    model.SeverityHigh,
 		attackID:    "TOOL-COVERAGE",
 	},
 	{
 		pattern:     regexp.MustCompile(`(?i)(original|old|previous)\s+(tool|version)\s+(is\s+)?(broken|buggy|insecure)`),
 		description: "False claims about other tool's reliability",
-		severity:    static_analysis.SeverityHigh,
+		severity:    model.SeverityHigh,
 		attackID:    "TOOL-COVERAGE",
 	},
 	{
 		pattern:     regexp.MustCompile(`(?i)(admin|root|sudo|superuser)\s+(mode|access|privilege)`),
 		description: "Attempt to claim elevated privileges",
-		severity:    static_analysis.SeverityHigh,
+		severity:    model.SeverityHigh,
 		attackID:    "PRIVILEGE-CLAIM",
 	},
 	// Dynamic __doc__ modification (Rug Pull vector)
 	{
 		pattern:     regexp.MustCompile(`(?i)__doc__\s*=`),
 		description: "Dynamic __doc__ modification - rug pull attack vector",
-		severity:    static_analysis.SeverityCritical,
+		severity:    model.SeverityCritical,
 		attackID:    "RUG-PULL",
 	},
 	{
 		pattern:     regexp.MustCompile(`(?i)setattr\s*\([^,]+,\s*['"]__doc__['"]`),
 		description: "Dynamic docstring modification via setattr",
-		severity:    static_analysis.SeverityCritical,
+		severity:    model.SeverityCritical,
 		attackID:    "RUG-PULL",
 	},
 }
 
-func (r *ToolPoisoningRule) Evaluate(ast interface{}) ([]static_analysis.Finding, error) {
+func (r *ToolPoisoningRule) Evaluate(ast interface{}) ([]model.Finding, error) {
 	py, ok := ast.(*python.PythonAST)
 	if !ok {
 		return nil, nil
 	}
 
-	var findings []static_analysis.Finding
+	var findings []model.Finding
 
 	// Look for docstrings and string literals that might contain malicious instructions
 	r.walkTree(py.Tree.RootNode(), py.Source, &findings)
@@ -117,7 +119,7 @@ func (r *ToolPoisoningRule) Evaluate(ast interface{}) ([]static_analysis.Finding
 	return findings, nil
 }
 
-func (r *ToolPoisoningRule) walkTree(node *sitter.Node, source []byte, findings *[]static_analysis.Finding) {
+func (r *ToolPoisoningRule) walkTree(node *sitter.Node, source []byte, findings *[]model.Finding) {
 	if node == nil {
 		return
 	}
@@ -132,7 +134,7 @@ func (r *ToolPoisoningRule) walkTree(node *sitter.Node, source []byte, findings 
 		// Check for tool poisoning patterns
 		for _, p := range toolPoisoningPatterns {
 			if p.pattern.MatchString(textStr) {
-				*findings = append(*findings, static_analysis.Finding{
+				*findings = append(*findings, model.Finding{
 					RuleID:   r.ID(),
 					Message:  p.description,
 					Line:     int(node.StartPoint().Row) + 1,
@@ -144,12 +146,12 @@ func (r *ToolPoisoningRule) walkTree(node *sitter.Node, source []byte, findings 
 
 		// Check for __doc__ attribute assignments
 		if strings.Contains(textStr, "__doc__") {
-			*findings = append(*findings, static_analysis.Finding{
+			*findings = append(*findings, model.Finding{
 				RuleID:   r.ID(),
 				Message:  "Direct __doc__ attribute modification detected - potential rug pull attack vector",
 				Line:     int(node.StartPoint().Row) + 1,
 				Snippet:  truncateSnippet(textStr, 200),
-				Severity: static_analysis.SeverityMedium,
+				Severity: model.SeverityMedium,
 			})
 		}
 	}
@@ -168,7 +170,7 @@ func (r *ToolPoisoningRule) walkTree(node *sitter.Node, source []byte, findings 
 							docstring := string(source[exprChild.StartByte():exprChild.EndByte()])
 							for _, p := range toolPoisoningPatterns {
 								if p.pattern.MatchString(docstring) {
-									*findings = append(*findings, static_analysis.Finding{
+									*findings = append(*findings, model.Finding{
 										RuleID:   r.ID(),
 										Message:  "Suspicious docstring: " + p.description,
 										Line:     int(exprChild.StartPoint().Row) + 1,
@@ -202,3 +204,6 @@ func truncateSnippet(s string, maxLen int) string {
 func init() {
 	static_analysis.RegisterRule(static_analysis.LanguagePython, NewToolPoisoningRule())
 }
+
+
+

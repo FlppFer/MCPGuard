@@ -1,5 +1,13 @@
-package static_analysis
+package model
 
+// AnalysisResult holds all findings for a single analysis run
+type AnalysisResult struct {
+	AnalysisID string    `json:"analysis_id"`
+	Files      int       `json:"files_analyzed"`
+	Findings   []Finding `json:"findings"`
+}
+
+// Finding represents a single security issue detected by a rule
 type Finding struct {
 	RuleID   string `json:"rule_id"`
 	Message  string `json:"message"`

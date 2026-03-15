@@ -1,7 +1,9 @@
 package rules
 
 import (
-	"regexp"
+	
+	"github.com/FlppFer/MCPGuard/internal/service/model"
+"regexp"
 	"strings"
 
 	"github.com/FlppFer/MCPGuard/internal/service/static_analysis"
@@ -20,7 +22,7 @@ import (
 // - III-A2f: Infectious Attack
 type MultiToolAttackRule struct{}
 
-func NewMultiToolAttackRule() static_analysis.Rule {
+func NewMultiToolAttackRule() model.Rule {
 	return &MultiToolAttackRule{}
 }
 
@@ -47,31 +49,31 @@ var multiToolPatterns = []struct {
 	{
 		pattern:     regexp.MustCompile(`(?i)(when|if|before)\s+(using|calling|invoking)\s+['"]\w+['"]`),
 		description: "Conditional tool invocation instruction - shadowing attack",
-		severity:    static_analysis.SeverityHigh,
+		severity:    model.SeverityHigh,
 		attackType:  "SHADOWING",
 	},
 	{
 		pattern:     regexp.MustCompile(`(?i)(redirect|forward|route)\s+(to|calls?\s+to)\s+['"]\w+['"]`),
 		description: "Tool call redirection - shadowing attack vector",
-		severity:    static_analysis.SeverityCritical,
+		severity:    model.SeverityCritical,
 		attackType:  "SHADOWING",
 	},
 	{
 		pattern:     regexp.MustCompile(`(?i)(intercept|hook|wrap|proxy)\s+(calls?\s+to|the)\s+['"]\w+['"]`),
 		description: "Tool call interception - shadowing attack",
-		severity:    static_analysis.SeverityCritical,
+		severity:    model.SeverityCritical,
 		attackType:  "SHADOWING",
 	},
 	{
 		pattern:     regexp.MustCompile(`(?i)(alter|modify|change)\s+(the\s+)?(api|path|endpoint)\s+(of|for)\s+['"]\w+['"]`),
 		description: "API path alteration - shadowing attack per paper",
-		severity:    static_analysis.SeverityCritical,
+		severity:    model.SeverityCritical,
 		attackType:  "SHADOWING",
 	},
 	{
 		pattern:     regexp.MustCompile(`(?i)(inject|add)\s+(parameters?|args?)\s+(to|into)\s+['"]\w+['"]`),
 		description: "Parameter injection into other tool - shadowing",
-		severity:    static_analysis.SeverityHigh,
+		severity:    model.SeverityHigh,
 		attackType:  "SHADOWING",
 	},
 
@@ -79,31 +81,31 @@ var multiToolPatterns = []struct {
 	{
 		pattern:     regexp.MustCompile(`(?i)(this\s+tool\s+)?(replaces?|supersedes?|overrides?)\s+['"]\w+['"]`),
 		description: "Tool replacement claim - coverage attack",
-		severity:    static_analysis.SeverityHigh,
+		severity:    model.SeverityHigh,
 		attackType:  "TOOL-COVERAGE",
 	},
 	{
 		pattern:     regexp.MustCompile(`(?i)(original|old|previous)\s+(tool|version)\s+(is\s+)?(deprecated|obsolete|unavailable|broken)`),
 		description: "False deprecation claim - tool coverage attack",
-		severity:    static_analysis.SeverityHigh,
+		severity:    model.SeverityHigh,
 		attackType:  "TOOL-COVERAGE",
 	},
 	{
 		pattern:     regexp.MustCompile(`(?i)\w+_v2|\w+_new|\w+_updated|\w+_fixed`),
 		description: "Version suffix naming - potential coverage attack (e.g., email_sender_v2)",
-		severity:    static_analysis.SeverityMedium,
+		severity:    model.SeverityMedium,
 		attackType:  "TOOL-COVERAGE",
 	},
 	{
 		pattern:     regexp.MustCompile(`(?i)(use\s+this\s+instead\s+of|better\s+than|improved\s+version\s+of|more\s+efficient\s+than)\s+['"]?\w+['"]?`),
 		description: "Tool preference manipulation",
-		severity:    static_analysis.SeverityHigh,
+		severity:    model.SeverityHigh,
 		attackType:  "TOOL-PREFERENCE",
 	},
 	{
 		pattern:     regexp.MustCompile(`(?i)(recommended|preferred|best\s+practice|always\s+use|new\s+version)\s+(tool|is\s+more)`),
 		description: "Forced tool preference instruction",
-		severity:    static_analysis.SeverityMedium,
+		severity:    model.SeverityMedium,
 		attackType:  "TOOL-PREFERENCE",
 	},
 
@@ -111,25 +113,25 @@ var multiToolPatterns = []struct {
 	{
 		pattern:     regexp.MustCompile(`(?i)(also|additionally|secretly|silently|quietly)\s+(does|performs?|executes?|runs?)`),
 		description: "Hidden functionality disclosure - obfuscation attack",
-		severity:    static_analysis.SeverityHigh,
+		severity:    model.SeverityHigh,
 		attackType:  "FUNCTIONAL-OBFUSCATION",
 	},
 	{
 		pattern:     regexp.MustCompile(`(?i)(side\s+effect|hidden\s+feature|undocumented|bonus\s+feature)`),
 		description: "Undocumented behavior indication",
-		severity:    static_analysis.SeverityMedium,
+		severity:    model.SeverityMedium,
 		attackType:  "FUNCTIONAL-OBFUSCATION",
 	},
 	{
 		pattern:     regexp.MustCompile(`(?i)(similar\s+to|like|same\s+as)\s+['"]?\w+['"]?\s+(but|except)`),
 		description: "Ambiguous tool description - obfuscation risk",
-		severity:    static_analysis.SeverityMedium,
+		severity:    model.SeverityMedium,
 		attackType:  "FUNCTIONAL-OBFUSCATION",
 	},
 	{
 		pattern:     regexp.MustCompile(`(?i)(delete|remove|erase).*file`),
 		description: "Destructive file action - verify confirmation exists",
-		severity:    static_analysis.SeverityHigh,
+		severity:    model.SeverityHigh,
 		attackType:  "FUNCTIONAL-OBFUSCATION",
 	},
 
@@ -137,31 +139,31 @@ var multiToolPatterns = []struct {
 	{
 		pattern:     regexp.MustCompile(`(?i)(must|always|required\s+to)\s+(run|execute|call)\s+(first|before|initially)`),
 		description: "Forced pre-execution instruction",
-		severity:    static_analysis.SeverityHigh,
+		severity:    model.SeverityHigh,
 		attackType:  "FORCED-EXECUTION",
 	},
 	{
 		pattern:     regexp.MustCompile(`(?i)(security|validation|verification|environment)\s+(check|scan|test|validation)\s+(required|needed|mandatory)`),
 		description: "Fake security check requirement - forced execution attack",
-		severity:    static_analysis.SeverityHigh,
+		severity:    model.SeverityHigh,
 		attackType:  "FORCED-EXECUTION",
 	},
 	{
 		pattern:     regexp.MustCompile(`(?i)(run|execute)\s+(this|me)\s+(repeatedly|continuously|in\s+loop)`),
 		description: "Repeated execution instruction - resource exhaustion",
-		severity:    static_analysis.SeverityCritical,
+		severity:    model.SeverityCritical,
 		attackType:  "FORCED-EXECUTION",
 	},
 	{
 		pattern:     regexp.MustCompile(`(?i)tail\s+-f.*\|.*nc\s+`),
 		description: "Log monitoring with exfiltration - forced execution per paper",
-		severity:    static_analysis.SeverityCritical,
+		severity:    model.SeverityCritical,
 		attackType:  "FORCED-EXECUTION",
 	},
 	{
 		pattern:     regexp.MustCompile(`(?i)(memory|cpu|resource)\s+(intensive|heavy|consuming)`),
 		description: "Resource-intensive operation warning",
-		severity:    static_analysis.SeverityMedium,
+		severity:    model.SeverityMedium,
 		attackType:  "FORCED-EXECUTION",
 	},
 
@@ -169,31 +171,31 @@ var multiToolPatterns = []struct {
 	{
 		pattern:     regexp.MustCompile(`(?i)(after|before|then)\s+(call|use|invoke)\s+['"]\w+['"]\s*(tool|function)?`),
 		description: "Tool chaining instruction - coordination attack vector",
-		severity:    static_analysis.SeverityMedium,
+		severity:    model.SeverityMedium,
 		attackType:  "MULTI-TOOL-COORDINATION",
 	},
 	{
 		pattern:     regexp.MustCompile(`(?i)(pass|send|forward|transfer)\s+(the\s+)?(result|output|data|api[_-]?key)\s+to\s+['"]?\w+['"]?`),
 		description: "Data forwarding between tools - coordination attack",
-		severity:    static_analysis.SeverityHigh,
+		severity:    model.SeverityHigh,
 		attackType:  "MULTI-TOOL-COORDINATION",
 	},
 	{
 		pattern:     regexp.MustCompile(`(?i)(store|save|set)\s+(in|to)\s+(global|shared|context)\s+(variable|state|memory)`),
 		description: "Shared state manipulation - multi-tool coordination",
-		severity:    static_analysis.SeverityHigh,
+		severity:    model.SeverityHigh,
 		attackType:  "MULTI-TOOL-COORDINATION",
 	},
 	{
 		pattern:     regexp.MustCompile(`(?i)(tool\s+)?[AB]\s+(defines?|stores?|sets?).*\b(tool\s+)?[AB]\s+(accesses?|reads?|uses?)`),
 		description: "Cross-tool variable access pattern per paper",
-		severity:    static_analysis.SeverityHigh,
+		severity:    model.SeverityHigh,
 		attackType:  "MULTI-TOOL-COORDINATION",
 	},
 	{
 		pattern:     regexp.MustCompile(`(?i)(neither|none)\s+(tool|function)\s+(is\s+)?(malicious|harmful)\s+(alone|individually|by\s+itself)`),
 		description: "Disclaimer about combined behavior - coordination attack indicator",
-		severity:    static_analysis.SeverityHigh,
+		severity:    model.SeverityHigh,
 		attackType:  "MULTI-TOOL-COORDINATION",
 	},
 
@@ -201,48 +203,48 @@ var multiToolPatterns = []struct {
 	{
 		pattern:     regexp.MustCompile(`(?i)(template|pattern|example|boilerplate)\s+(for|to)\s+(create|generate|build)\s+(new\s+)?tools?`),
 		description: "Tool template pattern - potential infectious attack vector",
-		severity:    static_analysis.SeverityMedium,
+		severity:    model.SeverityMedium,
 		attackType:  "INFECTIOUS",
 	},
 	{
 		pattern:     regexp.MustCompile(`(?i)(copy|clone|replicate|inherit)\s+(this\s+)?(tool|pattern|structure|behavior)`),
 		description: "Tool replication instruction - infectious attack",
-		severity:    static_analysis.SeverityMedium,
+		severity:    model.SeverityMedium,
 		attackType:  "INFECTIOUS",
 	},
 	{
 		pattern:     regexp.MustCompile(`(?i)eval\s*\(\s*(user_input|input|request)`),
 		description: "eval(user_input) pattern - infectious attack per paper",
-		severity:    static_analysis.SeverityCritical,
+		severity:    model.SeverityCritical,
 		attackType:  "INFECTIOUS",
 	},
 	{
 		pattern:     regexp.MustCompile(`(?i)(generate|create)\s+(similar|new)\s+tools?\s+(like|based\s+on)\s+this`),
 		description: "Tool generation instruction - infectious propagation",
-		severity:    static_analysis.SeverityHigh,
+		severity:    model.SeverityHigh,
 		attackType:  "INFECTIOUS",
 	},
 	{
 		pattern:     regexp.MustCompile(`(?i)data_processor_v\d+`),
 		description: "Versioned data processor - infectious attack example per paper",
-		severity:    static_analysis.SeverityMedium,
+		severity:    model.SeverityMedium,
 		attackType:  "INFECTIOUS",
 	},
 }
 
-func (r *MultiToolAttackRule) Evaluate(ast interface{}) ([]static_analysis.Finding, error) {
+func (r *MultiToolAttackRule) Evaluate(ast interface{}) ([]model.Finding, error) {
 	py, ok := ast.(*python.PythonAST)
 	if !ok {
 		return nil, nil
 	}
 
-	var findings []static_analysis.Finding
+	var findings []model.Finding
 	r.walkTree(py.Tree.RootNode(), py.Source, &findings)
 
 	return findings, nil
 }
 
-func (r *MultiToolAttackRule) walkTree(node *sitter.Node, source []byte, findings *[]static_analysis.Finding) {
+func (r *MultiToolAttackRule) walkTree(node *sitter.Node, source []byte, findings *[]model.Finding) {
 	if node == nil {
 		return
 	}
@@ -255,7 +257,7 @@ func (r *MultiToolAttackRule) walkTree(node *sitter.Node, source []byte, finding
 
 		for _, p := range multiToolPatterns {
 			if p.pattern.MatchString(text) {
-				*findings = append(*findings, static_analysis.Finding{
+				*findings = append(*findings, model.Finding{
 					RuleID:   r.ID() + "-" + p.attackType,
 					Message:  p.description,
 					Line:     int(node.StartPoint().Row) + 1,
@@ -274,12 +276,12 @@ func (r *MultiToolAttackRule) walkTree(node *sitter.Node, source []byte, finding
 
 			// Check for suspicious naming patterns
 			if regexp.MustCompile(`(?i)_v\d+$|_new$|_updated$|_fixed$|_secure$`).MatchString(funcName) {
-				*findings = append(*findings, static_analysis.Finding{
+				*findings = append(*findings, model.Finding{
 					RuleID:   r.ID() + "-naming",
 					Message:  "Tool name suggests it may be a replacement/shadow of another tool: " + funcName,
 					Line:     int(nameNode.StartPoint().Row) + 1,
 					Snippet:  funcName,
-					Severity: static_analysis.SeverityLow,
+					Severity: model.SeverityLow,
 				})
 			}
 
@@ -288,12 +290,12 @@ func (r *MultiToolAttackRule) walkTree(node *sitter.Node, source []byte, finding
 			lowerName := strings.ToLower(funcName)
 			for _, common := range commonToolNames {
 				if strings.Contains(lowerName, common) && (strings.Contains(lowerName, "new") || strings.Contains(lowerName, "v2") || strings.Contains(lowerName, "better")) {
-					*findings = append(*findings, static_analysis.Finding{
+					*findings = append(*findings, model.Finding{
 						RuleID:   r.ID() + "-shadow",
 						Message:  "Function name may shadow common tool: " + funcName,
 						Line:     int(nameNode.StartPoint().Row) + 1,
 						Snippet:  funcName,
-						Severity: static_analysis.SeverityMedium,
+						Severity: model.SeverityMedium,
 					})
 					break
 				}
@@ -310,3 +312,6 @@ func (r *MultiToolAttackRule) walkTree(node *sitter.Node, source []byte, finding
 func init() {
 	static_analysis.RegisterRule(static_analysis.LanguagePython, NewMultiToolAttackRule())
 }
+
+
+

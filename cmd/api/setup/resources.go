@@ -35,8 +35,8 @@ func Bootstrap(ctx context.Context, cfg *config.Config) *Resources {
 		panic(err)
 	}
 
-	// Create engine with local persistence disabled (results go to S3)
-	staticAnalyzerEngine := static_analysis.NewStaticAnalyzerEngine(
+	// Create static analysis service with local persistence disabled (results go to S3)
+	staticAnalysisService := static_analysis.NewService(
 		static_analysis.WithPersistence(false),
 	)
 
@@ -54,7 +54,7 @@ func Bootstrap(ctx context.Context, cfg *config.Config) *Resources {
 	webhookAuth := middleware.NewWebhookAuthenticator(cfg.AuthCfg.WebhookSecretKey)
 	apiKeyAuth := middleware.NewAPIKeyAuthenticator(cfg.AuthCfg.APIKeysKey)
 
-	gitWebhookService := service.NewGitWebhookService(dbClient, osClient, staticAnalyzerEngine)
+	gitWebhookService := service.NewGitWebhookService(dbClient, osClient, staticAnalysisService)
 	return &Resources{
 		WebhookAuthenticator:      webhookAuth,
 		APIKeyAuthenticator:       apiKeyAuth,
