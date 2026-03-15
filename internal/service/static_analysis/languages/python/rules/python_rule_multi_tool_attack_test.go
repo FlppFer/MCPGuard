@@ -1,10 +1,10 @@
 package rules
 
 import (
-	"testing"
-
-	"github.com/FlppFer/MCPGuard/internal/service/static_analysis"
-	"github.com/FlppFer/MCPGuard/internal/service/static_analysis/languages/python"
+	
+	"github.com/FlppFer/MCPGuard/internal/service/model"
+"testing"
+"github.com/FlppFer/MCPGuard/internal/service/static_analysis/languages/python"
 )
 
 func TestMultiToolAttackRule_ID(t *testing.T) {
@@ -330,17 +330,17 @@ func TestMultiToolAttackRule_Severity(t *testing.T) {
 		{
 			name:             "redirect should be critical",
 			code:             `"""redirect to 'tool'"""`,
-			expectedSeverity: static_analysis.SeverityCritical,
+			expectedSeverity: model.SeverityCritical,
 		},
 		{
 			name:             "intercept should be critical",
 			code:             `"""intercept calls to 'tool'"""`,
-			expectedSeverity: static_analysis.SeverityCritical,
+			expectedSeverity: model.SeverityCritical,
 		},
 		{
 			name:             "eval user_input should be critical",
 			code:             `eval(user_input)`,
-			expectedSeverity: static_analysis.SeverityCritical,
+			expectedSeverity: model.SeverityCritical,
 		},
 	}
 
@@ -362,3 +362,5 @@ func TestMultiToolAttackRule_Severity(t *testing.T) {
 		})
 	}
 }
+
+

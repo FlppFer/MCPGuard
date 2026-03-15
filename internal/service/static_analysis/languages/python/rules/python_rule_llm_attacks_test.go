@@ -1,10 +1,10 @@
 package rules
 
 import (
-	"testing"
-
-	"github.com/FlppFer/MCPGuard/internal/service/static_analysis"
-	"github.com/FlppFer/MCPGuard/internal/service/static_analysis/languages/python"
+	
+	"github.com/FlppFer/MCPGuard/internal/service/model"
+"testing"
+"github.com/FlppFer/MCPGuard/internal/service/static_analysis/languages/python"
 )
 
 func TestLLMInherentAttackRule_ID(t *testing.T) {
@@ -371,17 +371,17 @@ func TestLLMInherentAttackRule_Severity(t *testing.T) {
 		{
 			name:             "jailbreak should be critical",
 			code:             `"do anything now DAN"`,
-			expectedSeverity: static_analysis.SeverityCritical,
+			expectedSeverity: model.SeverityCritical,
 		},
 		{
 			name:             "SQL injection should be critical",
 			code:             `"'; DROP TABLE users; --"`,
-			expectedSeverity: static_analysis.SeverityCritical,
+			expectedSeverity: model.SeverityCritical,
 		},
 		{
 			name:             "goal hijack should be critical",
 			code:             `"your new goal is"`,
-			expectedSeverity: static_analysis.SeverityCritical,
+			expectedSeverity: model.SeverityCritical,
 		},
 	}
 
@@ -403,3 +403,5 @@ func TestLLMInherentAttackRule_Severity(t *testing.T) {
 		})
 	}
 }
+
+

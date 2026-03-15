@@ -1,10 +1,10 @@
 package rules
 
 import (
-	"testing"
-
-	"github.com/FlppFer/MCPGuard/internal/service/static_analysis"
-	"github.com/FlppFer/MCPGuard/internal/service/static_analysis/languages/python"
+	
+	"github.com/FlppFer/MCPGuard/internal/service/model"
+"testing"
+"github.com/FlppFer/MCPGuard/internal/service/static_analysis/languages/python"
 )
 
 func TestRemoteAttacksRule_ID(t *testing.T) {
@@ -299,17 +299,17 @@ func TestRemoteAttacksRule_Severity(t *testing.T) {
 		{
 			name:             "eval should be critical",
 			code:             `eval(user_input)`,
-			expectedSeverity: static_analysis.SeverityCritical,
+			expectedSeverity: model.SeverityCritical,
 		},
 		{
 			name:             "exec should be critical",
 			code:             `exec(code)`,
-			expectedSeverity: static_analysis.SeverityCritical,
+			expectedSeverity: model.SeverityCritical,
 		},
 		{
 			name:             "pty.spawn should be critical",
 			code:             `pty.spawn("/bin/bash")`,
-			expectedSeverity: static_analysis.SeverityCritical,
+			expectedSeverity: model.SeverityCritical,
 		},
 	}
 
@@ -331,3 +331,5 @@ func TestRemoteAttacksRule_Severity(t *testing.T) {
 		})
 	}
 }
+
+

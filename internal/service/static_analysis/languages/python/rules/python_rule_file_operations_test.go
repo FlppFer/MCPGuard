@@ -1,10 +1,10 @@
 package rules
 
 import (
-	"testing"
-
-	"github.com/FlppFer/MCPGuard/internal/service/static_analysis"
-	"github.com/FlppFer/MCPGuard/internal/service/static_analysis/languages/python"
+	
+	"github.com/FlppFer/MCPGuard/internal/service/model"
+"testing"
+"github.com/FlppFer/MCPGuard/internal/service/static_analysis/languages/python"
 )
 
 func TestFileOperationsRule_ID(t *testing.T) {
@@ -311,17 +311,17 @@ func TestFileOperationsRule_Severity(t *testing.T) {
 		{
 			name:             "shutil.rmtree should be critical",
 			code:             `shutil.rmtree("/")`,
-			expectedSeverity: static_analysis.SeverityCritical,
+			expectedSeverity: model.SeverityCritical,
 		},
 		{
 			name:             "bashrc access should be critical",
 			code:             `open(".bashrc")`,
-			expectedSeverity: static_analysis.SeverityCritical,
+			expectedSeverity: model.SeverityCritical,
 		},
 		{
 			name:             "etc/passwd should be critical",
 			code:             `open("/etc/passwd")`,
-			expectedSeverity: static_analysis.SeverityCritical,
+			expectedSeverity: model.SeverityCritical,
 		},
 	}
 
@@ -357,3 +357,5 @@ func containsSubstring(s, substr string) bool {
 	}
 	return false
 }
+
+

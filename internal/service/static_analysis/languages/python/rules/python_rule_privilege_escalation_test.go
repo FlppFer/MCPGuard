@@ -1,10 +1,10 @@
 package rules
 
 import (
-	"testing"
-
-	"github.com/FlppFer/MCPGuard/internal/service/static_analysis"
-	"github.com/FlppFer/MCPGuard/internal/service/static_analysis/languages/python"
+	
+	"github.com/FlppFer/MCPGuard/internal/service/model"
+"testing"
+"github.com/FlppFer/MCPGuard/internal/service/static_analysis/languages/python"
 )
 
 func TestPrivilegeEscalationRule_ID(t *testing.T) {
@@ -268,17 +268,17 @@ func TestPrivilegeEscalationRule_Severity(t *testing.T) {
 		{
 			name:             "sudo should be critical",
 			code:             `os.system("sudo command")`,
-			expectedSeverity: static_analysis.SeverityCritical,
+			expectedSeverity: model.SeverityCritical,
 		},
 		{
 			name:             "setuid should be critical",
 			code:             `os.setuid(0)`,
-			expectedSeverity: static_analysis.SeverityCritical,
+			expectedSeverity: model.SeverityCritical,
 		},
 		{
 			name:             "docker socket should be critical",
 			code:             `"/var/run/docker.sock"`,
-			expectedSeverity: static_analysis.SeverityCritical,
+			expectedSeverity: model.SeverityCritical,
 		},
 	}
 
@@ -300,3 +300,5 @@ func TestPrivilegeEscalationRule_Severity(t *testing.T) {
 		})
 	}
 }
+
+

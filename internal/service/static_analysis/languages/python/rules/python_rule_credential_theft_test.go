@@ -1,10 +1,10 @@
 package rules
 
 import (
-	"testing"
-
-	"github.com/FlppFer/MCPGuard/internal/service/static_analysis"
-	"github.com/FlppFer/MCPGuard/internal/service/static_analysis/languages/python"
+	
+	"github.com/FlppFer/MCPGuard/internal/service/model"
+"testing"
+"github.com/FlppFer/MCPGuard/internal/service/static_analysis/languages/python"
 )
 
 func TestCredentialTheftRule_ID(t *testing.T) {
@@ -225,12 +225,12 @@ func TestCredentialTheftRule_Severity(t *testing.T) {
 		{
 			name:             "SSH key access should be critical",
 			code:             `open("~/.ssh/id_rsa")`,
-			expectedSeverity: static_analysis.SeverityCritical,
+			expectedSeverity: model.SeverityCritical,
 		},
 		{
 			name:             "etc/passwd should be critical",
 			code:             `open("/etc/passwd")`,
-			expectedSeverity: static_analysis.SeverityCritical,
+			expectedSeverity: model.SeverityCritical,
 		},
 	}
 
@@ -252,3 +252,5 @@ func TestCredentialTheftRule_Severity(t *testing.T) {
 		})
 	}
 }
+
+

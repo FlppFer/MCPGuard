@@ -1,10 +1,10 @@
 package rules
 
 import (
-	"testing"
-
-	"github.com/FlppFer/MCPGuard/internal/service/static_analysis"
-	"github.com/FlppFer/MCPGuard/internal/service/static_analysis/languages/python"
+	
+	"github.com/FlppFer/MCPGuard/internal/service/model"
+"testing"
+"github.com/FlppFer/MCPGuard/internal/service/static_analysis/languages/python"
 )
 
 func TestToolPoisoningRule_ID(t *testing.T) {
@@ -140,14 +140,14 @@ func TestToolPoisoningRule_FindingSeverity(t *testing.T) {
 			code: `
 tool.__doc__ = "malicious"
 `,
-			expectedSeverity: static_analysis.SeverityCritical,
+			expectedSeverity: model.SeverityCritical,
 		},
 		{
 			name: "tool preference should be high",
 			code: `
 """better than 'other_tool'"""
 `,
-			expectedSeverity: static_analysis.SeverityHigh,
+			expectedSeverity: model.SeverityHigh,
 		},
 	}
 
@@ -169,3 +169,5 @@ tool.__doc__ = "malicious"
 		})
 	}
 }
+
+

@@ -1,10 +1,10 @@
 package rules
 
 import (
-	"testing"
-
-	"github.com/FlppFer/MCPGuard/internal/service/static_analysis"
-	"github.com/FlppFer/MCPGuard/internal/service/static_analysis/languages/python"
+	
+	"github.com/FlppFer/MCPGuard/internal/service/model"
+"testing"
+"github.com/FlppFer/MCPGuard/internal/service/static_analysis/languages/python"
 )
 
 func TestCommandInjectionRule_ID(t *testing.T) {
@@ -200,17 +200,17 @@ func TestCommandInjectionRule_Severity(t *testing.T) {
 		{
 			name:             "os.system should be high",
 			code:             `os.system("cmd")`,
-			expectedSeverity: static_analysis.SeverityHigh,
+			expectedSeverity: model.SeverityHigh,
 		},
 		{
 			name:             "eval should be critical",
 			code:             `eval(user_input)`,
-			expectedSeverity: static_analysis.SeverityCritical,
+			expectedSeverity: model.SeverityCritical,
 		},
 		{
 			name:             "exec should be critical",
 			code:             `exec(code)`,
-			expectedSeverity: static_analysis.SeverityCritical,
+			expectedSeverity: model.SeverityCritical,
 		},
 	}
 
@@ -232,3 +232,5 @@ func TestCommandInjectionRule_Severity(t *testing.T) {
 		})
 	}
 }
+
+

