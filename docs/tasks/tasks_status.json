@@ -1,0 +1,263 @@
+{
+  "project": "MCPGuard",
+  "last_updated": "2026-03-15",
+  "phases": [
+    {
+      "id": "phase-1",
+      "name": "Server Hardening & Code Quality",
+      "status": "not_started"
+    },
+    {
+      "id": "phase-2",
+      "name": "Docker & Deployment",
+      "status": "not_started"
+    },
+    {
+      "id": "phase-3",
+      "name": "Agentic Analysis Integration",
+      "status": "not_started"
+    },
+    {
+      "id": "phase-4",
+      "name": "Message Queue (RabbitMQ)",
+      "status": "not_started"
+    },
+    {
+      "id": "phase-5",
+      "name": "Observability",
+      "status": "not_started"
+    },
+    {
+      "id": "phase-6",
+      "name": "GitHub Actions PR Integration",
+      "status": "not_started"
+    },
+    {
+      "id": "phase-7",
+      "name": "Multi-Language Rule Expansion",
+      "status": "not_started"
+    }
+  ],
+  "tasks": [
+    {
+      "id": "task-1.1",
+      "phase": "phase-1",
+      "title": "Graceful Shutdown",
+      "status": "not_started",
+      "priority": "high",
+      "effort": "small",
+      "dependencies": [],
+      "file": "task-1.1-graceful-shutdown.md"
+    },
+    {
+      "id": "task-1.2",
+      "phase": "phase-1",
+      "title": "Consistent Structured Logging",
+      "status": "not_started",
+      "priority": "medium",
+      "effort": "small",
+      "dependencies": [],
+      "file": "task-1.2-structured-logging.md"
+    },
+    {
+      "id": "task-1.3",
+      "phase": "phase-1",
+      "title": "Typed Errors for Service Layer",
+      "status": "not_started",
+      "priority": "medium",
+      "effort": "small",
+      "dependencies": [],
+      "file": "task-1.3-typed-errors.md"
+    },
+    {
+      "id": "task-1.4",
+      "phase": "phase-1",
+      "title": "Request ID Middleware",
+      "status": "not_started",
+      "priority": "medium",
+      "effort": "small",
+      "dependencies": [],
+      "file": "task-1.4-request-id-middleware.md"
+    },
+    {
+      "id": "task-1.5",
+      "phase": "phase-1",
+      "title": "Temp Directory Cleanup",
+      "status": "not_started",
+      "priority": "medium",
+      "effort": "small",
+      "dependencies": [],
+      "file": "task-1.5-temp-cleanup.md"
+    },
+    {
+      "id": "task-2.1",
+      "phase": "phase-2",
+      "title": "Dockerfile (Multi-stage Build)",
+      "status": "not_started",
+      "priority": "high",
+      "effort": "small",
+      "dependencies": ["task-1.1"],
+      "file": "task-2.1-dockerfile.md"
+    },
+    {
+      "id": "task-2.2",
+      "phase": "phase-2",
+      "title": "Docker Compose (Local Development)",
+      "status": "not_started",
+      "priority": "high",
+      "effort": "small",
+      "dependencies": ["task-2.1"],
+      "file": "task-2.2-docker-compose.md"
+    },
+    {
+      "id": "task-2.3",
+      "phase": "phase-2",
+      "title": "GitHub Actions CI Workflow",
+      "status": "not_started",
+      "priority": "medium",
+      "effort": "small",
+      "dependencies": [],
+      "file": "task-2.3-ci-workflow.md"
+    },
+    {
+      "id": "task-3.1",
+      "phase": "phase-3",
+      "title": "Agentic Analysis DTOs",
+      "status": "not_started",
+      "priority": "high",
+      "effort": "small",
+      "dependencies": [],
+      "file": "task-3.1-agentic-dtos.md"
+    },
+    {
+      "id": "task-3.2",
+      "phase": "phase-3",
+      "title": "Agentic Analysis Service Interface",
+      "status": "not_started",
+      "priority": "high",
+      "effort": "small",
+      "dependencies": ["task-3.1"],
+      "file": "task-3.2-agentic-service.md"
+    },
+    {
+      "id": "task-3.3",
+      "phase": "phase-3",
+      "title": "Agentic Analysis Controller",
+      "status": "not_started",
+      "priority": "high",
+      "effort": "medium",
+      "dependencies": ["task-3.2"],
+      "file": "task-3.3-agentic-controller.md"
+    },
+    {
+      "id": "task-3.4",
+      "phase": "phase-3",
+      "title": "Integrate Agentic Submission into Pipeline",
+      "status": "not_started",
+      "priority": "medium",
+      "effort": "small",
+      "dependencies": ["task-3.2", "task-3.3"],
+      "file": "task-3.4-agentic-pipeline-integration.md"
+    },
+    {
+      "id": "task-3.5",
+      "phase": "phase-3",
+      "title": "Merged Results Endpoint",
+      "status": "not_started",
+      "priority": "low",
+      "effort": "small",
+      "dependencies": ["task-3.4"],
+      "file": "task-3.5-merged-results.md"
+    },
+    {
+      "id": "task-4.1",
+      "phase": "phase-4",
+      "title": "Message Queue Abstraction",
+      "status": "not_started",
+      "priority": "medium",
+      "effort": "medium",
+      "dependencies": [],
+      "file": "task-4.1-message-queue-abstraction.md"
+    },
+    {
+      "id": "task-4.2",
+      "phase": "phase-4",
+      "title": "Refactor Pipeline to Use Message Queue",
+      "status": "not_started",
+      "priority": "medium",
+      "effort": "medium",
+      "dependencies": ["task-4.1"],
+      "file": "task-4.2-pipeline-queue-refactor.md"
+    },
+    {
+      "id": "task-4.3",
+      "phase": "phase-4",
+      "title": "Add RabbitMQ to Docker Compose",
+      "status": "not_started",
+      "priority": "low",
+      "effort": "small",
+      "dependencies": ["task-2.2", "task-4.1"],
+      "file": "task-4.3-docker-rabbitmq.md"
+    },
+    {
+      "id": "task-5.1",
+      "phase": "phase-5",
+      "title": "Prometheus Metrics Endpoint",
+      "status": "not_started",
+      "priority": "medium",
+      "effort": "medium",
+      "dependencies": [],
+      "file": "task-5.1-prometheus-metrics.md"
+    },
+    {
+      "id": "task-5.2",
+      "phase": "phase-5",
+      "title": "Grafana Dashboard Definition",
+      "status": "not_started",
+      "priority": "low",
+      "effort": "small",
+      "dependencies": ["task-5.1", "task-2.2"],
+      "file": "task-5.2-grafana-dashboard.md"
+    },
+    {
+      "id": "task-6.1",
+      "phase": "phase-6",
+      "title": "PR Comment Service",
+      "status": "not_started",
+      "priority": "medium",
+      "effort": "medium",
+      "dependencies": [],
+      "file": "task-6.1-pr-comment-service.md"
+    },
+    {
+      "id": "task-6.2",
+      "phase": "phase-6",
+      "title": "GitHub Actions Workflow for MCPGuard Analysis",
+      "status": "not_started",
+      "priority": "medium",
+      "effort": "small",
+      "dependencies": ["task-6.1"],
+      "file": "task-6.2-actions-workflow.md"
+    },
+    {
+      "id": "task-6.3",
+      "phase": "phase-6",
+      "title": "Extract PR Number from Webhook Payload",
+      "status": "not_started",
+      "priority": "medium",
+      "effort": "small",
+      "dependencies": ["task-6.1"],
+      "file": "task-6.3-pr-payload.md"
+    },
+    {
+      "id": "task-7.1",
+      "phase": "phase-7",
+      "title": "JavaScript/TypeScript Rule Foundation",
+      "status": "not_started",
+      "priority": "low",
+      "effort": "medium",
+      "dependencies": [],
+      "file": "task-7.1-js-ts-rules.md"
+    }
+  ]
+}
