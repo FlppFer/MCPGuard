@@ -3,7 +3,7 @@ package config
 import (
 	"errors"
 	"fmt"
-	"log"
+	"log/slog"
 	"os"
 	"strings"
 
@@ -21,7 +21,7 @@ func LoadConfigByScope(scope string) (*Config, error) {
 		return nil, err
 	}
 
-	fmt.Printf("MCPGuard - Loading config file %s\n", fileName)
+	slog.Info("MCPGuard - Loading config file", "file", fileName)
 	return readFileConfig(fileName)
 }
 
@@ -94,7 +94,7 @@ func getScope() string {
 	// If an explicit SCOPE is provided, honor it first.
 	scope := os.Getenv("SCOPE")
 	if scope != "" {
-		log.Println("MCPGuard - Scope (from SCOPE env):", scope)
+		slog.Info("MCPGuard - Scope (from SCOPE env)", "scope", scope)
 		return scope
 	}
 
@@ -104,17 +104,17 @@ func getScope() string {
 	if os.Getenv("VERCEL") != "" {
 		vercelEnv := os.Getenv("VERCEL_ENV")
 		if strings.EqualFold(vercelEnv, "production") {
-			log.Println("MCPGuard - Detected Vercel production environment; using scope: prod")
+			slog.Info("MCPGuard - Detected Vercel production environment", "scope", "prod")
 			return "prod"
 		}
 		// Non-production Vercel deployments treat as local by default.
-		log.Println("MCPGuard - Detected Vercel non-production environment; using scope: local")
+		slog.Info("MCPGuard - Detected Vercel non-production environment", "scope", "local")
 		return "local"
 	}
 
 	// Fallback to local when nothing else is set.
 	scope = "local"
-	log.Println("MCPGuard - Scope: ", scope)
+	slog.Info("MCPGuard - Scope", "scope", scope)
 	return scope
 }
 

@@ -4,7 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"log"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"time"
@@ -87,6 +87,11 @@ func (uc *gitWebhookServiceImpl) RequestAnalysis(
 		return nil, err
 	}
 
+	// Clean up zip file after successful upload
+	if err := os.Remove(repo.ZipPath); err != nil {
+		slog.Warn("Failed to clean up zip file", "path", repo.ZipPath, "error", err)
+	}
+
 	// 4. Parse repository files
 	parsedFiles, err := utils.ParseRepositoryFiles(repo.LocalPath)
 	if err != nil {
@@ -104,12 +109,19 @@ func (uc *gitWebhookServiceImpl) RequestAnalysis(
 	// 6. Trigger async static analysis
 	// Use background context since the HTTP request context will be cancelled after response
 	go func() {
+		// Clean up cloned repo when done (success or failure)
+		defer func() {
+			if err := os.RemoveAll(repo.LocalPath); err != nil {
+				slog.Warn("Failed to clean up cloned repo", "path", repo.LocalPath, "error", err)
+			}
+		}()
+
 		asyncCtx := context.Background()
 
 		// Run analysis and get results directly (no local file saving)
 		result, err := uc.staticAnalyzer.RunAnalysis(asyncCtx, analysisID, parsedFiles)
 		if err != nil {
-			log.Println("Static analysis failed:", err)
+			slog.Error("Static analysis failed", "analysis_id", analysisID, "error", err)
 			entity.Status = "static_analysis_failed"
 			entity.ErrorMessage = err.Error()
 			uc.dbRepo.Update(context.Background(), entity)
@@ -118,7 +130,7 @@ func (uc *gitWebhookServiceImpl) RequestAnalysis(
 
 		// Upload results to object storage
 		if err := uc.uploadAnalysisResult(asyncCtx, analysisID, result); err != nil {
-			log.Println("Failed to upload analysis results:", err)
+			slog.Error("Failed to upload analysis results", "analysis_id", analysisID, "error", err)
 			entity.Status = "storage_upload_failed"
 			entity.ErrorMessage = err.Error()
 			uc.dbRepo.Update(context.Background(), entity)
@@ -160,7 +172,7 @@ func (uc *gitWebhookServiceImpl) uploadAnalysisResult(ctx context.Context, analy
 		return fmt.Errorf("failed to upload to storage: %w", err)
 	}
 
-	log.Printf("Analysis results uploaded to storage: %s", s3Key)
+	slog.Info("Analysis results uploaded to storage", "analysis_id", analysisID, "s3_key", s3Key)
 	return nil
 }
 
@@ -168,7 +180,7 @@ func (uc *gitWebhookServiceImpl) uploadAnalysisResult(ctx context.Context, analy
 func (uc *gitWebhookServiceImpl) GetAnalysisStatus(ctx context.Context, analysisID string) (*services.AnalysisStatusDTO, error) {
 	entity, err := uc.dbRepo.FindByID(ctx, analysisID)
 	if err != nil {
-		return nil, fmt.Errorf("analysis not found: %w", err)
+		return nil, fmt.Errorf("%w: %s", ErrAnalysisNotFound, err.Error())
 	}
 
 	return &services.AnalysisStatusDTO{
@@ -188,11 +200,11 @@ func (uc *gitWebhookServiceImpl) GetAnalysisResult(ctx context.Context, analysis
 	// First check if analysis exists and is complete
 	entity, err := uc.dbRepo.FindByID(ctx, analysisID)
 	if err != nil {
-		return nil, fmt.Errorf("analysis not found: %w", err)
+		return nil, fmt.Errorf("%w: %s", ErrAnalysisNotFound, err.Error())
 	}
 
 	if entity.Status != "static_done" && entity.Status != "completed" {
-		return nil, fmt.Errorf("analysis not complete, current status: %s", entity.Status)
+		return nil, fmt.Errorf("%w, current status: %s", ErrAnalysisNotComplete, entity.Status)
 	}
 
 	// Download result from S3

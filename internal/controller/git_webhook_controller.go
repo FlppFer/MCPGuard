@@ -2,9 +2,9 @@ package controller
 
 import (
 	"encoding/json"
+	"errors"
 	"log/slog"
 	"net/http"
-	"strings"
 	"time"
 
 	"github.com/go-chi/chi/v5"
@@ -121,7 +121,11 @@ func (c *gitWebhookController) GetAnalysisStatus() http.HandlerFunc {
 		status, err := c.gitWebhookService.GetAnalysisStatus(r.Context(), analysisID)
 		if err != nil {
 			slog.Error("Failed to get analysis status", "error", err, "analysis_id", analysisID)
-			c.writeError(w, http.StatusNotFound, "not_found", err.Error())
+			if errors.Is(err, service.ErrAnalysisNotFound) {
+				c.writeError(w, http.StatusNotFound, "not_found", err.Error())
+			} else {
+				c.writeError(w, http.StatusInternalServerError, "internal_error", err.Error())
+			}
 			return
 		}
 
@@ -140,11 +144,12 @@ func (c *gitWebhookController) GetAnalysisResult() http.HandlerFunc {
 		data, err := c.gitWebhookService.GetAnalysisResult(r.Context(), analysisID)
 		if err != nil {
 			slog.Error("Failed to get analysis result", "error", err, "analysis_id", analysisID)
-			// Check if it's a "not complete" error vs "not found"
-			if strings.Contains(err.Error(), "not complete") {
+			if errors.Is(err, service.ErrAnalysisNotComplete) {
 				c.writeError(w, http.StatusAccepted, "analysis_pending", err.Error())
-			} else {
+			} else if errors.Is(err, service.ErrAnalysisNotFound) {
 				c.writeError(w, http.StatusNotFound, "not_found", err.Error())
+			} else {
+				c.writeError(w, http.StatusInternalServerError, "internal_error", err.Error())
 			}
 			return
 		}

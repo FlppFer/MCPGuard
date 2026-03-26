@@ -4,25 +4,28 @@ import (
 	"log/slog"
 	"net/http"
 
-	middleware "github.com/FlppFer/MCPGuard/internal/middleware/auth"
+	customMiddleware "github.com/FlppFer/MCPGuard/internal/middleware"
+	authMiddleware "github.com/FlppFer/MCPGuard/internal/middleware/auth"
 	"github.com/go-chi/chi/v5"
 )
 
-func InitRoutes(resources *Resources) {
+// NewRouter builds and returns the configured chi.Mux (does NOT start serving).
+func NewRouter(resources *Resources) *chi.Mux {
 	slog.Info("Initializing routes")
 
 	r := chi.NewRouter()
+	r.Use(customMiddleware.RequestID)
 
 	r.Route("/v1", func(r chi.Router) {
 		// Webhook endpoints require GitHub signature verification
 		r.Group(func(r chi.Router) {
-			r.Use(middleware.WebhookAuth(resources.WebhookAuthenticator))
+			r.Use(authMiddleware.WebhookAuth(resources.WebhookAuthenticator))
 			r.Post("/webhook/github", resources.GitWebhookController.HandleGitHubWebhook())
 		})
 
 		// API endpoints require API key authentication
 		r.Group(func(r chi.Router) {
-			r.Use(middleware.Auth(resources.APIKeyAuthenticator))
+			r.Use(authMiddleware.Auth(resources.APIKeyAuthenticator))
 			r.Post("/analysis", resources.GitWebhookController.StartAnalysis())
 			r.Get("/analysis/{id}/status", resources.GitWebhookController.GetAnalysisStatus())
 			r.Get("/analysis/{id}/result", resources.GitWebhookController.GetAnalysisResult())
@@ -36,9 +39,5 @@ func InitRoutes(resources *Resources) {
 		w.Write([]byte(`{"status":"ok"}`))
 	})
 
-	slog.Info("Starting HTTP server", "port", 8080)
-	err := http.ListenAndServe(":8080", r)
-	if err != nil {
-		panic(err)
-	}
+	return r
 }

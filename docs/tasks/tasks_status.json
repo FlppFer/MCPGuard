@@ -1,11 +1,11 @@
 {
   "project": "MCPGuard",
-  "last_updated": "2026-03-15",
+  "last_updated": "2026-03-22",
   "phases": [
     {
       "id": "phase-1",
       "name": "Server Hardening & Code Quality",
-      "status": "not_started"
+      "status": "completed"
     },
     {
       "id": "phase-2",
@@ -43,7 +43,7 @@
       "id": "task-1.1",
       "phase": "phase-1",
       "title": "Graceful Shutdown",
-      "status": "not_started",
+      "status": "completed",
       "priority": "high",
       "effort": "small",
       "dependencies": [],
@@ -53,7 +53,7 @@
       "id": "task-1.2",
       "phase": "phase-1",
       "title": "Consistent Structured Logging",
-      "status": "not_started",
+      "status": "completed",
       "priority": "medium",
       "effort": "small",
       "dependencies": [],
@@ -63,7 +63,7 @@
       "id": "task-1.3",
       "phase": "phase-1",
       "title": "Typed Errors for Service Layer",
-      "status": "not_started",
+      "status": "completed",
       "priority": "medium",
       "effort": "small",
       "dependencies": [],
@@ -73,7 +73,7 @@
       "id": "task-1.4",
       "phase": "phase-1",
       "title": "Request ID Middleware",
-      "status": "not_started",
+      "status": "completed",
       "priority": "medium",
       "effort": "small",
       "dependencies": [],
@@ -83,7 +83,7 @@
       "id": "task-1.5",
       "phase": "phase-1",
       "title": "Temp Directory Cleanup",
-      "status": "not_started",
+      "status": "completed",
       "priority": "medium",
       "effort": "small",
       "dependencies": [],

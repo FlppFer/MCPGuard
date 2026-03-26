@@ -335,7 +335,23 @@ func init() {
 
 ---
 
-## 11. Planned Components (Not Yet Implemented)
+## 12. Testing Requirements
+
+### 12.1 Coverage Target
+
+The project targets a minimum of **90% code coverage** across the full codebase. All new code must include unit tests that contribute toward this goal.
+
+### 12.2 Guidelines
+
+- Every new package, service, controller, middleware, and rule must ship with corresponding `_test.go` files.
+- Use table-driven tests where applicable.
+- Mock external dependencies (database, object storage, HTTP clients) via interfaces.
+- Coverage is measured with `go test -coverprofile=coverage.out ./...` and enforced in CI.
+- Coverage below 90% should block merges in pull requests.
+
+---
+
+## 13. Planned Components (Not Yet Implemented)
 
 | Component | Technology | Purpose |
 |-----------|-----------|---------|

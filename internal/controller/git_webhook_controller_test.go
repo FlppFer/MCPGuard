@@ -3,7 +3,7 @@ package controller
 import (
 	"context"
 	"encoding/json"
-	"errors"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -12,6 +12,7 @@ import (
 	"github.com/go-chi/chi/v5"
 
 	"github.com/FlppFer/MCPGuard/internal/model/services"
+	"github.com/FlppFer/MCPGuard/internal/service"
 )
 
 // mockGitWebhookService implements service.GitWebhookService for testing
@@ -75,12 +76,12 @@ func TestGetAnalysisStatus(t *testing.T) {
 			name:       "not found - analysis does not exist",
 			analysisID: "nonexistent-id",
 			mockFunc: func(ctx context.Context, analysisID string) (*services.AnalysisStatusDTO, error) {
-				return nil, errors.New("analysis not found")
+				return nil, fmt.Errorf("%w: record not found", service.ErrAnalysisNotFound)
 			},
 			expectedStatus: http.StatusNotFound,
 			expectedBody: map[string]interface{}{
 				"error":   "not_found",
-				"message": "analysis not found",
+				"message": "analysis not found: record not found",
 			},
 		},
 		{
@@ -185,7 +186,7 @@ func TestGetAnalysisResult(t *testing.T) {
 			name:       "pending - analysis not complete",
 			analysisID: "pending-123",
 			mockFunc: func(ctx context.Context, analysisID string) ([]byte, error) {
-				return nil, errors.New("analysis not complete, current status: static_analysis_started")
+				return nil, fmt.Errorf("%w, current status: static_analysis_started", service.ErrAnalysisNotComplete)
 			},
 			expectedStatus: http.StatusAccepted,
 			checkBody: func(t *testing.T, body []byte) {
@@ -202,7 +203,7 @@ func TestGetAnalysisResult(t *testing.T) {
 			name:       "not found - analysis does not exist",
 			analysisID: "nonexistent",
 			mockFunc: func(ctx context.Context, analysisID string) ([]byte, error) {
-				return nil, errors.New("analysis not found")
+				return nil, fmt.Errorf("%w: record not found", service.ErrAnalysisNotFound)
 			},
 			expectedStatus: http.StatusNotFound,
 			checkBody: func(t *testing.T, body []byte) {
@@ -216,19 +217,19 @@ func TestGetAnalysisResult(t *testing.T) {
 			},
 		},
 		{
-			name:       "not found - download failed",
+			name:       "internal error - download failed",
 			analysisID: "download-fail",
 			mockFunc: func(ctx context.Context, analysisID string) ([]byte, error) {
-				return nil, errors.New("failed to download result: S3 error")
+				return nil, fmt.Errorf("failed to download result: %w", fmt.Errorf("S3 error"))
 			},
-			expectedStatus: http.StatusNotFound,
+			expectedStatus: http.StatusInternalServerError,
 			checkBody: func(t *testing.T, body []byte) {
 				var result map[string]interface{}
 				if err := json.Unmarshal(body, &result); err != nil {
 					t.Fatalf("failed to unmarshal result: %v", err)
 				}
-				if result["error"] != "not_found" {
-					t.Errorf("expected error=not_found, got %v", result["error"])
+				if result["error"] != "internal_error" {
+					t.Errorf("expected error=internal_error, got %v", result["error"])
 				}
 			},
 		},
