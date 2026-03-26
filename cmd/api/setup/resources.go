@@ -25,6 +25,21 @@ type (
 )
 
 func Bootstrap(ctx context.Context, cfg *config.Config) *Resources {
+	dbClient, osClient := initRepositories(cfg)
+	webhookAuth, apiKeyAuth := initAuthenticators(cfg)
+	staticAnalyzer := static_analysis.NewService(static_analysis.WithPersistence(false))
+	agenticService, agenticEnabled := initAgenticService(cfg, dbClient, osClient)
+	gitWebhookService := service.NewGitWebhookService(dbClient, osClient, staticAnalyzer, agenticService, agenticEnabled)
+
+	return &Resources{
+		WebhookAuthenticator:      webhookAuth,
+		APIKeyAuthenticator:       apiKeyAuth,
+		GitWebhookController:      controller.NewGitWebhookController(gitWebhookService),
+		AgenticAnalysisController: controller.NewAgenticAnalysisController(agenticService),
+	}
+}
+
+func initRepositories(cfg *config.Config) (db.DatabaseClient, obj_storage.StorageRepository) {
 	dbClient, err := db.NewDatabaseClient(cfg.DbCfg)
 	if err != nil {
 		panic(err)
@@ -35,12 +50,10 @@ func Bootstrap(ctx context.Context, cfg *config.Config) *Resources {
 		panic(err)
 	}
 
-	// Create static analysis service with local persistence disabled (results go to S3)
-	staticAnalysisService := static_analysis.NewService(
-		static_analysis.WithPersistence(false),
-	)
+	return dbClient, osClient
+}
 
-	// Create authenticators from config
+func initAuthenticators(cfg *config.Config) (middleware.Authenticator, middleware.Authenticator) {
 	if cfg.AuthCfg == nil {
 		panic("auth configuration is required")
 	}
@@ -53,12 +66,21 @@ func Bootstrap(ctx context.Context, cfg *config.Config) *Resources {
 
 	webhookAuth := middleware.NewWebhookAuthenticator(cfg.AuthCfg.WebhookSecretKey)
 	apiKeyAuth := middleware.NewAPIKeyAuthenticator(cfg.AuthCfg.APIKeysKey)
+	return webhookAuth, apiKeyAuth
+}
 
-	gitWebhookService := service.NewGitWebhookService(dbClient, osClient, staticAnalysisService)
-	return &Resources{
-		WebhookAuthenticator:      webhookAuth,
-		APIKeyAuthenticator:       apiKeyAuth,
-		GitWebhookController:      controller.NewGitWebhookController(gitWebhookService),
-		AgenticAnalysisController: controller.NewAgenticAnalysisController(),
+func initAgenticService(
+	cfg *config.Config,
+	dbClient db.DatabaseClient,
+	osClient obj_storage.StorageRepository,
+) (service.AgenticAnalysisService, bool) {
+	if cfg.AgenticCfg == nil || !cfg.AgenticCfg.Enabled {
+		return service.NewAgenticAnalysisService(dbClient, osClient, "", false), false
 	}
+
+	if cfg.AgenticCfg.Mock {
+		return service.NewMockAgenticAnalysisService(dbClient, osClient), true
+	}
+
+	return service.NewAgenticAnalysisService(dbClient, osClient, cfg.AgenticCfg.WorkerURL, true), true
 }

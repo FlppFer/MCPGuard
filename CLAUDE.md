@@ -123,6 +123,20 @@ resources/test/       → Test fixtures
 - Group imports: stdlib → external → internal. Separated by blank lines.
 - Use named imports only when needed to resolve ambiguity (e.g., `authMiddleware`, `httpmodel`).
 
+### Named Constants for Strings
+- **Every string used for statuses, S3 key patterns, log messages, error codes, and format templates must be a named `const`.**
+- Define constants in the package where they originate (e.g., status constants in `model/repositories/`, S3 key patterns in `service/`).
+- Group related constants in a `const ( ... )` block with a descriptive comment.
+- This improves readability, prevents typos, and makes refactoring safe (single source of truth).
+- Example:
+  ```go
+  const (
+      StatusCreated             = "created"
+      StatusStaticAnalysisDone  = "static_analysis_done"
+      S3KeyStaticResult         = "analysis-results/%s_static.json"
+  )
+  ```
+
 ## Testing
 
 ### Coverage Target

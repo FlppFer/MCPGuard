@@ -18,6 +18,7 @@ type GitWebhookControllerInterface interface {
 	HandleGitHubWebhook() http.HandlerFunc
 	GetAnalysisStatus() http.HandlerFunc
 	GetAnalysisResult() http.HandlerFunc
+	GetMergedResult() http.HandlerFunc
 }
 
 type gitWebhookController struct {
@@ -35,31 +36,31 @@ func (c *gitWebhookController) StartAnalysis() http.HandlerFunc {
 		var req httpmodel.WebHookRequestDTO
 
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-			c.writeError(w, http.StatusBadRequest, "invalid_request", "Failed to parse request body")
+			c.writeError(w, http.StatusBadRequest, ErrCodeInvalidRequest, MsgFailedParseBody)
 			return
 		}
 
 		if req.RepoURL == "" {
-			c.writeError(w, http.StatusBadRequest, "missing_field", "repo_url is required")
+			c.writeError(w, http.StatusBadRequest, ErrCodeMissingField, MsgRepoURLRequired)
 			return
 		}
 
 		// Default branch to main if not specified
 		if req.Branch == "" {
-			req.Branch = "main"
+			req.Branch = MsgDefaultBranch
 		}
 
 		result, err := c.gitWebhookService.RequestAnalysis(r.Context(), req.RepoURL, req.Branch, req.Commit)
 		if err != nil {
 			slog.Error("Failed to start analysis", "error", err)
-			c.writeError(w, http.StatusInternalServerError, "analysis_failed", err.Error())
+			c.writeError(w, http.StatusInternalServerError, ErrCodeAnalysisFailed, err.Error())
 			return
 		}
 
 		resp := httpmodel.WebHookResponseDTO{
 			AnalysisID: result.AnalysisID,
 			Status:     result.Status,
-			Message:    "Analysis started successfully",
+			Message:    MsgAnalysisStarted,
 			Timestamp:  time.Now(),
 		}
 
@@ -74,7 +75,7 @@ func (c *gitWebhookController) HandleGitHubWebhook() http.HandlerFunc {
 
 		if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
 			slog.Error("Failed to parse GitHub webhook payload", "error", err)
-			c.writeError(w, http.StatusBadRequest, "invalid_payload", "Failed to parse GitHub webhook payload")
+			c.writeError(w, http.StatusBadRequest, ErrCodeInvalidPayload, MsgFailedParsePayload)
 			return
 		}
 
@@ -83,7 +84,7 @@ func (c *gitWebhookController) HandleGitHubWebhook() http.HandlerFunc {
 		commit := payload.GetCommit()
 
 		if repoURL == "" {
-			c.writeError(w, http.StatusBadRequest, "missing_field", "repository.clone_url is required")
+			c.writeError(w, http.StatusBadRequest, ErrCodeMissingField, MsgCloneURLRequired)
 			return
 		}
 
@@ -95,14 +96,14 @@ func (c *gitWebhookController) HandleGitHubWebhook() http.HandlerFunc {
 		result, err := c.gitWebhookService.RequestAnalysis(r.Context(), repoURL, branch, commit)
 		if err != nil {
 			slog.Error("Failed to start analysis from GitHub webhook", "error", err)
-			c.writeError(w, http.StatusInternalServerError, "analysis_failed", err.Error())
+			c.writeError(w, http.StatusInternalServerError, ErrCodeAnalysisFailed, err.Error())
 			return
 		}
 
 		resp := httpmodel.WebHookResponseDTO{
 			AnalysisID: result.AnalysisID,
 			Status:     result.Status,
-			Message:    "Analysis started successfully",
+			Message:    MsgAnalysisStarted,
 			Timestamp:  time.Now(),
 		}
 
@@ -114,7 +115,7 @@ func (c *gitWebhookController) GetAnalysisStatus() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		analysisID := chi.URLParam(r, "id")
 		if analysisID == "" {
-			c.writeError(w, http.StatusBadRequest, "missing_id", "Analysis ID is required")
+			c.writeError(w, http.StatusBadRequest, ErrCodeMissingID, MsgIDRequired)
 			return
 		}
 
@@ -122,9 +123,9 @@ func (c *gitWebhookController) GetAnalysisStatus() http.HandlerFunc {
 		if err != nil {
 			slog.Error("Failed to get analysis status", "error", err, "analysis_id", analysisID)
 			if errors.Is(err, service.ErrAnalysisNotFound) {
-				c.writeError(w, http.StatusNotFound, "not_found", err.Error())
+				c.writeError(w, http.StatusNotFound, ErrCodeNotFound, err.Error())
 			} else {
-				c.writeError(w, http.StatusInternalServerError, "internal_error", err.Error())
+				c.writeError(w, http.StatusInternalServerError, ErrCodeInternalError, err.Error())
 			}
 			return
 		}
@@ -137,7 +138,7 @@ func (c *gitWebhookController) GetAnalysisResult() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		analysisID := chi.URLParam(r, "id")
 		if analysisID == "" {
-			c.writeError(w, http.StatusBadRequest, "missing_id", "Analysis ID is required")
+			c.writeError(w, http.StatusBadRequest, ErrCodeMissingID, MsgIDRequired)
 			return
 		}
 
@@ -145,24 +146,50 @@ func (c *gitWebhookController) GetAnalysisResult() http.HandlerFunc {
 		if err != nil {
 			slog.Error("Failed to get analysis result", "error", err, "analysis_id", analysisID)
 			if errors.Is(err, service.ErrAnalysisNotComplete) {
-				c.writeError(w, http.StatusAccepted, "analysis_pending", err.Error())
+				c.writeError(w, http.StatusAccepted, ErrCodeAnalysisPending, err.Error())
 			} else if errors.Is(err, service.ErrAnalysisNotFound) {
-				c.writeError(w, http.StatusNotFound, "not_found", err.Error())
+				c.writeError(w, http.StatusNotFound, ErrCodeNotFound, err.Error())
 			} else {
-				c.writeError(w, http.StatusInternalServerError, "internal_error", err.Error())
+				c.writeError(w, http.StatusInternalServerError, ErrCodeInternalError, err.Error())
 			}
 			return
 		}
 
 		// Return raw JSON result
-		w.Header().Set("Content-Type", "application/json; charset=UTF-8")
+		w.Header().Set("Content-Type", ContentTypeJSON)
 		w.WriteHeader(http.StatusOK)
 		w.Write(data)
 	}
 }
 
+// GetMergedResult handles GET /v1/analysis/{id}/result/full — returns combined static + agentic findings.
+func (c *gitWebhookController) GetMergedResult() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		analysisID := chi.URLParam(r, "id")
+		if analysisID == "" {
+			c.writeError(w, http.StatusBadRequest, ErrCodeMissingID, MsgIDRequired)
+			return
+		}
+
+		merged, err := c.gitWebhookService.GetMergedResult(r.Context(), analysisID)
+		if err != nil {
+			slog.Error("Failed to get merged result", "error", err, "analysis_id", analysisID)
+			if errors.Is(err, service.ErrAnalysisNotComplete) {
+				c.writeError(w, http.StatusAccepted, ErrCodeAnalysisPending, err.Error())
+			} else if errors.Is(err, service.ErrAnalysisNotFound) {
+				c.writeError(w, http.StatusNotFound, ErrCodeNotFound, err.Error())
+			} else {
+				c.writeError(w, http.StatusInternalServerError, ErrCodeInternalError, err.Error())
+			}
+			return
+		}
+
+		c.writeJSON(w, http.StatusOK, merged)
+	}
+}
+
 func (c *gitWebhookController) writeJSON(w http.ResponseWriter, status int, data interface{}) {
-	w.Header().Set("Content-Type", "application/json; charset=UTF-8")
+	w.Header().Set("Content-Type", ContentTypeJSON)
 	w.WriteHeader(status)
 	if err := json.NewEncoder(w).Encode(data); err != nil {
 		slog.Error("Failed to encode response", "error", err)

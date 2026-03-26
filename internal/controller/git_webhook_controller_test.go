@@ -20,6 +20,7 @@ type mockGitWebhookService struct {
 	requestAnalysisFunc   func(ctx context.Context, repoURL, branch, commit string) (*services.GitWebhookAnalysisResultDTO, error)
 	getAnalysisStatusFunc func(ctx context.Context, analysisID string) (*services.AnalysisStatusDTO, error)
 	getAnalysisResultFunc func(ctx context.Context, analysisID string) ([]byte, error)
+	getMergedResultFunc   func(ctx context.Context, analysisID string) (*services.MergedAnalysisResultDTO, error)
 }
 
 func (m *mockGitWebhookService) RequestAnalysis(ctx context.Context, repoURL, branch, commit string) (*services.GitWebhookAnalysisResultDTO, error) {
@@ -39,6 +40,13 @@ func (m *mockGitWebhookService) GetAnalysisStatus(ctx context.Context, analysisI
 func (m *mockGitWebhookService) GetAnalysisResult(ctx context.Context, analysisID string) ([]byte, error) {
 	if m.getAnalysisResultFunc != nil {
 		return m.getAnalysisResultFunc(ctx, analysisID)
+	}
+	return nil, nil
+}
+
+func (m *mockGitWebhookService) GetMergedResult(ctx context.Context, analysisID string) (*services.MergedAnalysisResultDTO, error) {
+	if m.getMergedResultFunc != nil {
+		return m.getMergedResultFunc(ctx, analysisID)
 	}
 	return nil, nil
 }

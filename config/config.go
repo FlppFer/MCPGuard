@@ -16,6 +16,13 @@ type (
 		DbCfg            *DatabaseConfig      `yaml:"data_base"`
 		ObjectStorageCfg *ObjectStorageConfig `yaml:"object_storage"`
 		AuthCfg          *AuthConfig          `yaml:"auth"`
+		AgenticCfg       *AgenticConfig       `yaml:"agentic"`
+	}
+
+	AgenticConfig struct {
+		Enabled   bool   `yaml:"enabled"`
+		Mock      bool   `yaml:"mock"`
+		WorkerURL string `yaml:"worker_url"`
 	}
 
 	AuthConfig struct {

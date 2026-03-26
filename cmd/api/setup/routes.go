@@ -29,7 +29,9 @@ func NewRouter(resources *Resources) *chi.Mux {
 			r.Post("/analysis", resources.GitWebhookController.StartAnalysis())
 			r.Get("/analysis/{id}/status", resources.GitWebhookController.GetAnalysisStatus())
 			r.Get("/analysis/{id}/result", resources.GitWebhookController.GetAnalysisResult())
-			r.Post("/agentic_analysis", resources.AgenticAnalysisController.RequestAgenticAnalysis())
+			r.Get("/analysis/{id}/result/full", resources.GitWebhookController.GetMergedResult())
+			r.Post("/agentic_analysis", resources.AgenticAnalysisController.ReceiveAgenticResult())
+			r.Get("/agentic_analysis/{id}/result", resources.AgenticAnalysisController.GetAgenticResult())
 		})
 	})
 

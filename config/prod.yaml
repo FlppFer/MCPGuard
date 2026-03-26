@@ -18,3 +18,9 @@ object_storage:
 auth:
   webhook_secret_key: "GITHUB_WEBHOOK_SECRET"
   api_keys_key: "MCPGUARD_API_KEYS"
+
+# Agentic (AI-based) analysis configuration
+agentic:
+  enabled: true
+  mock: false
+  worker_url: "http://python-worker:5000"

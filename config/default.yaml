@@ -13,3 +13,9 @@ object_storage:
 auth:
   webhook_secret_key: "GITHUB_WEBHOOK_SECRET"  # For GitHub webhook signature verification
   api_keys_key: "MCPGUARD_API_KEYS"            # Format: "client_id:api_key,client_id2:api_key2"
+
+# Agentic (AI-based) analysis configuration
+agentic:
+  enabled: true
+  mock: true
+  worker_url: "http://localhost:5000"
