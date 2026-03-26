@@ -1,6 +1,6 @@
 {
   "project": "MCPGuard",
-  "last_updated": "2026-03-22",
+  "last_updated": "2026-03-26",
   "phases": [
     {
       "id": "phase-1",
@@ -10,7 +10,7 @@
     {
       "id": "phase-2",
       "name": "Docker & Deployment",
-      "status": "not_started"
+      "status": "completed"
     },
     {
       "id": "phase-3",
@@ -93,7 +93,7 @@
       "id": "task-2.1",
       "phase": "phase-2",
       "title": "Dockerfile (Multi-stage Build)",
-      "status": "not_started",
+      "status": "completed",
       "priority": "high",
       "effort": "small",
       "dependencies": ["task-1.1"],
@@ -103,7 +103,7 @@
       "id": "task-2.2",
       "phase": "phase-2",
       "title": "Docker Compose (Local Development)",
-      "status": "not_started",
+      "status": "completed",
       "priority": "high",
       "effort": "small",
       "dependencies": ["task-2.1"],
@@ -113,7 +113,7 @@
       "id": "task-2.3",
       "phase": "phase-2",
       "title": "GitHub Actions CI Workflow",
-      "status": "not_started",
+      "status": "completed",
       "priority": "medium",
       "effort": "small",
       "dependencies": [],

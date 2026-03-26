@@ -1,0 +1,7 @@
+.git
+.github
+docs/
+*.md
+analysis_results/
+mcpguard-local-storage/
+resources/test/
