@@ -19,14 +19,14 @@ The codebase uses two different logging libraries: `log.Println`/`log.Printf` (G
 
 ### Expected Behavior
 
-1. All log output uses `log/slog` exclusively.
+1. All log output uses `slog` exclusively.
 2. Log entries include structured fields (`"analysis_id"`, `"error"`, `"repo_url"`, etc.) for machine-parseable output.
 3. Log level is configurable via the `log-level` field in the YAML config (currently defined but not wired).
 4. Debug-level logs are suppressed in production (`prod.yaml` uses `"error"` level).
 
 ### Acceptance Criteria
 
-- No imports of `"log"` package remain in the codebase (only `"log/slog"`).
+- No imports of `"log"` package remain in the codebase (only `"slog"`).
 - All log calls include relevant structured fields.
 - `cfg.LogLevel` is applied to the default `slog` handler at startup.
 
