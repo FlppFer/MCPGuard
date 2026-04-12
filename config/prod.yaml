@@ -5,7 +5,7 @@ data_base:
   mock: false
 
 object_storage:
-  mock: false
+  provider: "s3"                # Options: "filesystem", "localstack", "s3"
   base-path: "./storage"
   s3:
     bucket: "mcpguard-artifacts"

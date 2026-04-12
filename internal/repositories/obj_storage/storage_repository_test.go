@@ -17,25 +17,36 @@ func TestNewObjectStorageClient_NilConfig(t *testing.T) {
 	}
 }
 
-func TestNewObjectStorageClient_ProductionModeWithoutS3Config(t *testing.T) {
+func TestNewObjectStorageClient_S3WithoutS3Config(t *testing.T) {
 	cfg := &config.ObjectStorageConfig{
-		Mock: false,
-		S3:   nil,
+		Provider: "s3",
+		S3:       nil,
 	}
 
 	_, err := NewObjectStorageClient(cfg)
 	if err == nil {
-		t.Fatal("Expected error for production mode without S3 config, got nil")
+		t.Fatal("Expected error for s3 provider without S3 config, got nil")
 	}
-	expectedMsg := "S3 configuration is required for production mode"
+	expectedMsg := "S3 configuration is required when provider is 's3'"
 	if err.Error() != expectedMsg {
 		t.Errorf("Expected error message '%s', got '%s'", expectedMsg, err.Error())
 	}
 }
 
-func TestNewObjectStorageClient_ProductionModeWithS3Config(t *testing.T) {
+func TestNewObjectStorageClient_UnknownProvider(t *testing.T) {
 	cfg := &config.ObjectStorageConfig{
-		Mock: false,
+		Provider: "invalid",
+	}
+
+	_, err := NewObjectStorageClient(cfg)
+	if err == nil {
+		t.Fatal("Expected error for unknown provider, got nil")
+	}
+}
+
+func TestNewObjectStorageClient_S3WithConfig(t *testing.T) {
+	cfg := &config.ObjectStorageConfig{
+		Provider: "s3",
 		S3: &config.S3Config{
 			Bucket:         "test-bucket",
 			Region:         "us-east-1",
@@ -55,7 +66,7 @@ func TestNewObjectStorageClient_ProductionModeWithS3Config(t *testing.T) {
 	// Verify it's an S3Storage instance
 	s3Storage, ok := storage.(*S3Storage)
 	if !ok {
-		t.Fatal("Expected S3Storage instance for production mode")
+		t.Fatal("Expected S3Storage instance for s3 provider")
 	}
 	if s3Storage.bucket != "test-bucket" {
 		t.Errorf("Expected bucket 'test-bucket', got '%s'", s3Storage.bucket)

@@ -5,7 +5,7 @@ data_base:
   mock: true
 
 object_storage:
-  mock: true
+  provider: "localstack"        # Options: "localstack", "s3"
   base-path: "mcpguard-local-storage"
 
 # Authentication Configuration

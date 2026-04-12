@@ -47,9 +47,11 @@ type (
 		Path string `yaml:"path"`
 	}
 
+	// ObjectStorageConfig configures the storage backend.
+	// Provider must be one of: "localstack", "s3".
 	ObjectStorageConfig struct {
+		Provider string    `yaml:"provider"`
 		BasePath string    `yaml:"base-path"`
-		Mock     bool      `yaml:"mock"`
 		S3       *S3Config `yaml:"s3"`
 	}
 

@@ -13,31 +13,35 @@ type StorageRepository interface {
 	GetFileURL(key string) (string, error)
 }
 
-// NewObjectStorageClient creates a storage client based on configuration
+// NewObjectStorageClient creates a storage client based on the configured provider.
+// Supported providers: "localstack" (S3-compatible local dev), "s3" (AWS S3 production).
 func NewObjectStorageClient(cfg *config.ObjectStorageConfig) (StorageRepository, error) {
 	if cfg == nil {
 		return nil, fmt.Errorf("object storage configuration is nil")
 	}
 
-	if cfg.Mock {
-		localStorage, err := NewLocalStorage(cfg.BasePath)
+	switch cfg.Provider {
+	case "localstack":
+		storage, err := NewLocalStorage(cfg.BasePath)
 		if err != nil {
-			return nil, fmt.Errorf("failed to create local storage: %w", err)
+			return nil, fmt.Errorf("failed to create localstack storage: %w", err)
 		}
-		return localStorage, nil
-	}
+		return storage, nil
 
-	// Production S3 storage
-	if cfg.S3 == nil {
-		return nil, fmt.Errorf("S3 configuration is required for production mode")
-	}
+	case "s3":
+		if cfg.S3 == nil {
+			return nil, fmt.Errorf("S3 configuration is required when provider is 's3'")
+		}
+		ctx := context.Background()
+		return NewS3Storage(
+			ctx,
+			cfg.S3.Bucket,
+			cfg.S3.Endpoint,
+			cfg.S3.Region,
+			cfg.S3.ForcePathStyle,
+		)
 
-	ctx := context.Background()
-	return NewS3Storage(
-		ctx,
-		cfg.S3.Bucket,
-		cfg.S3.Endpoint,
-		cfg.S3.Region,
-		cfg.S3.ForcePathStyle,
-	)
+	default:
+		return nil, fmt.Errorf("unknown object storage provider: %q (must be 'localstack' or 's3')", cfg.Provider)
+	}
 }
