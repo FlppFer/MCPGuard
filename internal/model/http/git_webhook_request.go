@@ -43,3 +43,19 @@ func (p *GitHubPushPayload) GetCommit() string {
 func (p *GitHubPushPayload) GetRepoURL() string {
 	return p.Repository.CloneURL
 }
+
+// GitHubPullRequestPayload represents the GitHub pull_request event webhook payload.
+type GitHubPullRequestPayload struct {
+	Action      string `json:"action"` // "opened", "synchronize", "reopened", "closed", etc.
+	Number      int    `json:"number"` // PR number
+	PullRequest struct {
+		Head struct {
+			Ref string `json:"ref"` // branch name
+			SHA string `json:"sha"` // commit SHA
+		} `json:"head"`
+	} `json:"pull_request"`
+	Repository struct {
+		CloneURL string `json:"clone_url"`
+		FullName string `json:"full_name"` // "owner/repo"
+	} `json:"repository"`
+}

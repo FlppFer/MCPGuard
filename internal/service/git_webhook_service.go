@@ -9,11 +9,14 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/FlppFer/MCPGuard/internal/messaging"
+	"github.com/FlppFer/MCPGuard/internal/metrics"
 	httpmodel "github.com/FlppFer/MCPGuard/internal/model/http"
 	repositories2 "github.com/FlppFer/MCPGuard/internal/model/repositories"
 	"github.com/FlppFer/MCPGuard/internal/model/services"
 	"github.com/FlppFer/MCPGuard/internal/repositories/db"
 	"github.com/FlppFer/MCPGuard/internal/repositories/obj_storage"
+	ghintegration "github.com/FlppFer/MCPGuard/internal/service/github_integration"
 	"github.com/FlppFer/MCPGuard/internal/service/model"
 	"github.com/FlppFer/MCPGuard/internal/service/static_analysis"
 	"github.com/FlppFer/MCPGuard/internal/utils"
@@ -22,17 +25,21 @@ import (
 
 type GitWebhookService interface {
 	RequestAnalysis(ctx context.Context, repoURL, branch, commit string) (*services.GitWebhookAnalysisResultDTO, error)
+	RequestAnalysisWithPR(ctx context.Context, repoURL, branch, commit string, prNumber int, repoFullName string) (*services.GitWebhookAnalysisResultDTO, error)
 	GetAnalysisStatus(ctx context.Context, analysisID string) (*services.AnalysisStatusDTO, error)
 	GetAnalysisResult(ctx context.Context, analysisID string) ([]byte, error)
 	GetMergedResult(ctx context.Context, analysisID string) (*services.MergedAnalysisResultDTO, error)
 }
 
 type gitWebhookServiceImpl struct {
-	dbRepo         db.DatabaseClient
-	storageRepo    obj_storage.StorageRepository
-	staticAnalyzer static_analysis.Service
-	agenticService AgenticAnalysisService
-	agenticEnabled bool
+	dbRepo           db.DatabaseClient
+	storageRepo      obj_storage.StorageRepository
+	staticAnalyzer   static_analysis.Service
+	agenticService   AgenticAnalysisService
+	agenticEnabled   bool
+	publisher        messaging.MessagePublisher
+	queueEnabled     bool
+	prCommentService ghintegration.PRCommentService
 }
 
 func NewGitWebhookService(
@@ -41,13 +48,19 @@ func NewGitWebhookService(
 	staticAnalyzer static_analysis.Service,
 	agenticService AgenticAnalysisService,
 	agenticEnabled bool,
+	publisher messaging.MessagePublisher,
+	queueEnabled bool,
+	prCommentService ghintegration.PRCommentService,
 ) GitWebhookService {
 	return &gitWebhookServiceImpl{
-		dbRepo:         dbRepo,
-		storageRepo:    storageRepo,
-		staticAnalyzer: staticAnalyzer,
-		agenticService: agenticService,
-		agenticEnabled: agenticEnabled,
+		dbRepo:           dbRepo,
+		storageRepo:      storageRepo,
+		staticAnalyzer:   staticAnalyzer,
+		agenticService:   agenticService,
+		agenticEnabled:   agenticEnabled,
+		publisher:        publisher,
+		queueEnabled:     queueEnabled,
+		prCommentService: prCommentService,
 	}
 }
 
@@ -100,8 +113,53 @@ func (uc *gitWebhookServiceImpl) RequestAnalysis(
 		slog.Warn("Failed to clean up zip file", "path", repo.ZipPath, "error", err)
 	}
 
-	// 4. Parse repository files
-	parsedFiles, err := utils.ParseRepositoryFiles(repo.LocalPath)
+	// 4. Queue-based or local analysis
+	if uc.queueEnabled {
+		if err := uc.publishAnalysisJob(ctx, entity, analysisID, repoURL, branch, commit); err != nil {
+			return nil, err
+		}
+		// Clean up cloned repo immediately — worker will download from S3
+		if err := os.RemoveAll(repo.LocalPath); err != nil {
+			slog.Warn("Failed to clean up cloned repo", "path", repo.LocalPath, "error", err)
+		}
+	} else {
+		uc.runLocalAnalysis(entity, analysisID, repoURL, branch, commit, repo.LocalPath)
+	}
+
+	// 5. Respond to webhook
+	return &services.GitWebhookAnalysisResultDTO{
+		AnalysisID: analysisID,
+		Status:     entity.Status,
+		Timestamp:  time.Now(),
+	}, nil
+}
+
+func (uc *gitWebhookServiceImpl) RequestAnalysisWithPR(
+	ctx context.Context,
+	repoURL, branch, commit string,
+	prNumber int,
+	repoFullName string,
+) (*services.GitWebhookAnalysisResultDTO, error) {
+
+	analysisID := uuid.NewString()
+
+	entity := &repositories2.AnalysisEntity{
+		ID:           analysisID,
+		RepoURL:      repoURL,
+		Branch:       branch,
+		Commit:       commit,
+		PRNumber:     prNumber,
+		RepoFullName: repoFullName,
+		Status:       repositories2.StatusCreated.String(),
+		CreatedAt:    time.Now(),
+		UpdatedAt:    time.Now(),
+	}
+
+	if err := uc.dbRepo.Create(ctx, entity); err != nil {
+		return nil, err
+	}
+
+	repo, err := utils.DownloadRepo(repoURL, branch, commit)
 	if err != nil {
 		entity.Status = repositories2.StatusFailed.String()
 		entity.ErrorMessage = err.Error()
@@ -109,55 +167,36 @@ func (uc *gitWebhookServiceImpl) RequestAnalysis(
 		return nil, err
 	}
 
-	// 5. Update status to indicate static analysis started
-	entity.Status = repositories2.StatusStaticAnalysisRunning.String()
-	entity.UpdatedAt = time.Now()
+	entity.SourceArchivePath = repo.ZipPath
+	entity.Status = repositories2.StatusDownloadingRepo.String()
 	uc.dbRepo.Update(ctx, entity)
 
-	// 6. Trigger async static analysis
-	// Use background context since the HTTP request context will be cancelled after response
-	go func() {
-		// Clean up cloned repo when done (success or failure)
-		defer func() {
-			if err := os.RemoveAll(repo.LocalPath); err != nil {
-				slog.Warn("Failed to clean up cloned repo", "path", repo.LocalPath, "error", err)
-			}
-		}()
+	err = uc.storageRepo.UploadFile(ctx, fmt.Sprintf(S3KeySourceArchive, analysisID), repo.ZipPath)
+	if err != nil {
+		entity.Status = repositories2.StatusFailed.String()
+		entity.ErrorMessage = err.Error()
+		uc.dbRepo.Update(ctx, entity)
+		return nil, err
+	}
 
-		asyncCtx := context.Background()
+	if err := os.Remove(repo.ZipPath); err != nil {
+		slog.Warn("Failed to clean up zip file", "path", repo.ZipPath, "error", err)
+	}
 
-		// Run analysis and get results directly (no local file saving)
-		result, err := uc.staticAnalyzer.RunAnalysis(asyncCtx, analysisID, parsedFiles)
-		if err != nil {
-			slog.Error("Static analysis failed", "analysis_id", analysisID, "error", err)
-			entity.Status = repositories2.StatusFailed.String()
-			entity.ErrorMessage = err.Error()
-			uc.dbRepo.Update(context.Background(), entity)
-			return
+	if uc.queueEnabled {
+		if err := uc.publishAnalysisJob(ctx, entity, analysisID, repoURL, branch, commit); err != nil {
+			return nil, err
 		}
-
-		// Upload results to object storage
-		if err := uc.uploadAnalysisResult(asyncCtx, analysisID, result); err != nil {
-			slog.Error("Failed to upload analysis results", "analysis_id", analysisID, "error", err)
-			entity.Status = repositories2.StatusFailed.String()
-			entity.ErrorMessage = err.Error()
-			uc.dbRepo.Update(context.Background(), entity)
-			return
+		if err := os.RemoveAll(repo.LocalPath); err != nil {
+			slog.Warn("Failed to clean up cloned repo", "path", repo.LocalPath, "error", err)
 		}
+	} else {
+		uc.runLocalAnalysis(entity, analysisID, repoURL, branch, commit, repo.LocalPath)
+	}
 
-		// Update DB success state
-		entity.Status = repositories2.StatusStaticAnalysisDone.String()
-		entity.UpdatedAt = time.Now()
-		uc.dbRepo.Update(context.Background(), entity)
-
-		// Optionally trigger agentic analysis
-		uc.submitAgenticAnalysis(asyncCtx, entity, analysisID, repoURL, branch, commit)
-	}()
-
-	// 7. Respond to webhook
 	return &services.GitWebhookAnalysisResultDTO{
 		AnalysisID: analysisID,
-		Status:     repositories2.StatusCreated.String(),
+		Status:     entity.Status,
 		Timestamp:  time.Now(),
 	}, nil
 }
@@ -311,4 +350,108 @@ func (uc *gitWebhookServiceImpl) submitAgenticAnalysis(
 		entity.UpdatedAt = time.Now()
 		uc.dbRepo.Update(ctx, entity)
 	}
+}
+
+// publishAnalysisJob publishes an analysis job to the message queue for worker processing.
+func (uc *gitWebhookServiceImpl) publishAnalysisJob(
+	ctx context.Context,
+	entity *repositories2.AnalysisEntity,
+	analysisID, repoURL, branch, commit string,
+) error {
+	jobMsg := &messaging.AnalysisJobMessage{
+		AnalysisID: analysisID,
+		RepoURL:    repoURL,
+		Branch:     branch,
+		Commit:     commit,
+		SourceKey:  fmt.Sprintf(S3KeySourceArchive, analysisID),
+	}
+	msgBytes, err := json.Marshal(jobMsg)
+	if err != nil {
+		return fmt.Errorf("failed to marshal analysis job: %w", err)
+	}
+
+	if err := uc.publisher.Publish(ctx, messaging.QueueStaticAnalysis, msgBytes); err != nil {
+		slog.Error("Failed to publish analysis job", "analysis_id", analysisID, "error", err)
+		entity.Status = repositories2.StatusFailed.String()
+		entity.ErrorMessage = fmt.Sprintf("queue publish failed: %v", err)
+		uc.dbRepo.Update(ctx, entity)
+		metrics.AnalysesTotal.WithLabelValues("queue", "failure").Inc()
+		return err
+	}
+
+	entity.Status = repositories2.StatusQueued.String()
+	entity.UpdatedAt = time.Now()
+	uc.dbRepo.Update(ctx, entity)
+	metrics.AnalysesTotal.WithLabelValues("queue", "queued").Inc()
+
+	slog.Info("Analysis job published to queue", "analysis_id", analysisID)
+	return nil
+}
+
+// runLocalAnalysis runs static analysis in a goroutine (local/dev mode without message queue).
+func (uc *gitWebhookServiceImpl) runLocalAnalysis(
+	entity *repositories2.AnalysisEntity,
+	analysisID, repoURL, branch, commit, localPath string,
+) {
+	// Parse repository files
+	parsedFiles, err := utils.ParseRepositoryFiles(localPath)
+	if err != nil {
+		entity.Status = repositories2.StatusFailed.String()
+		entity.ErrorMessage = err.Error()
+		uc.dbRepo.Update(context.Background(), entity)
+		return
+	}
+
+	entity.Status = repositories2.StatusStaticAnalysisRunning.String()
+	entity.UpdatedAt = time.Now()
+	uc.dbRepo.Update(context.Background(), entity)
+
+	go func() {
+		defer func() {
+			if err := os.RemoveAll(localPath); err != nil {
+				slog.Warn("Failed to clean up cloned repo", "path", localPath, "error", err)
+			}
+		}()
+
+		asyncCtx := context.Background()
+		analysisStart := time.Now()
+
+		result, err := uc.staticAnalyzer.RunAnalysis(asyncCtx, analysisID, parsedFiles)
+		if err != nil {
+			slog.Error("Static analysis failed", "analysis_id", analysisID, "error", err)
+			entity.Status = repositories2.StatusFailed.String()
+			entity.ErrorMessage = err.Error()
+			uc.dbRepo.Update(context.Background(), entity)
+			metrics.AnalysesTotal.WithLabelValues("local", "failure").Inc()
+			return
+		}
+
+		metrics.AnalysisDuration.Observe(time.Since(analysisStart).Seconds())
+		for _, f := range result.Findings {
+			metrics.FindingsTotal.WithLabelValues(f.Severity).Inc()
+		}
+
+		if err := uc.uploadAnalysisResult(asyncCtx, analysisID, result); err != nil {
+			slog.Error("Failed to upload analysis results", "analysis_id", analysisID, "error", err)
+			entity.Status = repositories2.StatusFailed.String()
+			entity.ErrorMessage = err.Error()
+			uc.dbRepo.Update(context.Background(), entity)
+			metrics.AnalysesTotal.WithLabelValues("local", "failure").Inc()
+			return
+		}
+
+		entity.Status = repositories2.StatusStaticAnalysisDone.String()
+		entity.UpdatedAt = time.Now()
+		uc.dbRepo.Update(context.Background(), entity)
+		metrics.AnalysesTotal.WithLabelValues("local", "success").Inc()
+
+		// Post PR comment if this was a PR-triggered analysis
+		if entity.PRNumber > 0 && uc.prCommentService != nil {
+			if err := uc.prCommentService.PostFindings(asyncCtx, entity.RepoFullName, entity.PRNumber, result); err != nil {
+				slog.Warn("Failed to post PR comment", "analysis_id", analysisID, "error", err)
+			}
+		}
+
+		uc.submitAgenticAnalysis(asyncCtx, entity, analysisID, repoURL, branch, commit)
+	}()
 }

@@ -30,6 +30,13 @@ func (m *mockGitWebhookService) RequestAnalysis(ctx context.Context, repoURL, br
 	return nil, nil
 }
 
+func (m *mockGitWebhookService) RequestAnalysisWithPR(ctx context.Context, repoURL, branch, commit string, prNumber int, repoFullName string) (*services.GitWebhookAnalysisResultDTO, error) {
+	if m.requestAnalysisFunc != nil {
+		return m.requestAnalysisFunc(ctx, repoURL, branch, commit)
+	}
+	return nil, nil
+}
+
 func (m *mockGitWebhookService) GetAnalysisStatus(ctx context.Context, analysisID string) (*services.AnalysisStatusDTO, error) {
 	if m.getAnalysisStatusFunc != nil {
 		return m.getAnalysisStatusFunc(ctx, analysisID)

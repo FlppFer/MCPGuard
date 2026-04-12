@@ -15,6 +15,66 @@ services:
       - mcpguard-storage:/app/mcpguard-local-storage
     restart: unless-stopped
 
+  rabbitmq:
+    image: rabbitmq:3-management-alpine
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    environment:
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    profiles:
+      - queue
+
+  mcpguard-worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    environment:
+      - MODE=worker
+      - SCOPE=local
+      - RABBITMQ_URL=amqp://guest:guest@rabbitmq:5672/
+      - GITHUB_WEBHOOK_SECRET=${GITHUB_WEBHOOK_SECRET:-default-webhook-secret}
+      - MCPGUARD_API_KEYS=${MCPGUARD_API_KEYS:-dev-client:dev-key}
+    volumes:
+      - mcpguard-storage:/app/mcpguard-local-storage
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    restart: unless-stopped
+    profiles:
+      - queue
+
+  prometheus:
+    image: prom/prometheus:latest
+    volumes:
+      - ./deploy/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+    ports:
+      - "9090:9090"
+    profiles:
+      - observability
+
+  grafana:
+    image: grafana/grafana:latest
+    volumes:
+      - ./deploy/grafana/provisioning:/etc/grafana/provisioning
+      - ./deploy/grafana/dashboards:/var/lib/grafana/dashboards
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_AUTH_ANONYMOUS_ENABLED=true
+      - GF_AUTH_ANONYMOUS_ORG_ROLE=Viewer
+    depends_on:
+      - prometheus
+    profiles:
+      - observability
+
   localstack:
     image: localstack/localstack:latest
     ports:

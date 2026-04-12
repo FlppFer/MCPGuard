@@ -7,6 +7,7 @@ import (
 	customMiddleware "github.com/FlppFer/MCPGuard/internal/middleware"
 	authMiddleware "github.com/FlppFer/MCPGuard/internal/middleware/auth"
 	"github.com/go-chi/chi/v5"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
 // NewRouter builds and returns the configured chi.Mux (does NOT start serving).
@@ -15,6 +16,7 @@ func NewRouter(resources *Resources) *chi.Mux {
 
 	r := chi.NewRouter()
 	r.Use(customMiddleware.RequestID)
+	r.Use(customMiddleware.PrometheusHTTP)
 
 	r.Route("/v1", func(r chi.Router) {
 		// Webhook endpoints require GitHub signature verification
@@ -40,6 +42,9 @@ func NewRouter(resources *Resources) *chi.Mux {
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte(`{"status":"ok"}`))
 	})
+
+	// Prometheus metrics endpoint (no auth required)
+	r.Get("/metrics", promhttp.Handler().ServeHTTP)
 
 	return r
 }

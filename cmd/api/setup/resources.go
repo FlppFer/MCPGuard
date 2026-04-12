@@ -2,16 +2,21 @@ package setup
 
 import (
 	"context"
+	"fmt"
+	"os"
 
 	"github.com/FlppFer/MCPGuard/config"
 	"github.com/FlppFer/MCPGuard/internal/controller"
+	"github.com/FlppFer/MCPGuard/internal/messaging"
 	middleware "github.com/FlppFer/MCPGuard/internal/middleware/auth"
 	"github.com/FlppFer/MCPGuard/internal/repositories/db"
 	"github.com/FlppFer/MCPGuard/internal/repositories/obj_storage"
 	"github.com/FlppFer/MCPGuard/internal/service"
+	ghintegration "github.com/FlppFer/MCPGuard/internal/service/github_integration"
 	"github.com/FlppFer/MCPGuard/internal/service/static_analysis"
 
-	// Import rules package to trigger init() functions that register all analysis rules
+	// Import rules packages to trigger init() functions that register all analysis rules
+	_ "github.com/FlppFer/MCPGuard/internal/service/static_analysis/languages/javascript/rules"
 	_ "github.com/FlppFer/MCPGuard/internal/service/static_analysis/languages/python/rules"
 )
 
@@ -21,6 +26,11 @@ type (
 		APIKeyAuthenticator       middleware.Authenticator
 		GitWebhookController      controller.GitWebhookControllerInterface
 		AgenticAnalysisController controller.AgenticAnalysisControllerInterface
+		Publisher                 messaging.MessagePublisher
+		DBClient                  db.DatabaseClient
+		StorageClient             obj_storage.StorageRepository
+		AgenticService            service.AgenticAnalysisService
+		AgenticEnabled            bool
 	}
 )
 
@@ -29,13 +39,21 @@ func Bootstrap(ctx context.Context, cfg *config.Config) *Resources {
 	webhookAuth, apiKeyAuth := initAuthenticators(cfg)
 	staticAnalyzer := static_analysis.NewService(static_analysis.WithPersistence(false))
 	agenticService, agenticEnabled := initAgenticService(cfg, dbClient, osClient)
-	gitWebhookService := service.NewGitWebhookService(dbClient, osClient, staticAnalyzer, agenticService, agenticEnabled)
+	publisher := initPublisher(cfg)
+	queueEnabled := cfg.MessagingCfg != nil && cfg.MessagingCfg.Enabled
+	prCommentService := initPRCommentService(cfg)
+	gitWebhookService := service.NewGitWebhookService(dbClient, osClient, staticAnalyzer, agenticService, agenticEnabled, publisher, queueEnabled, prCommentService)
 
 	return &Resources{
 		WebhookAuthenticator:      webhookAuth,
 		APIKeyAuthenticator:       apiKeyAuth,
 		GitWebhookController:      controller.NewGitWebhookController(gitWebhookService),
 		AgenticAnalysisController: controller.NewAgenticAnalysisController(agenticService),
+		Publisher:                 publisher,
+		DBClient:                  dbClient,
+		StorageClient:             osClient,
+		AgenticService:            agenticService,
+		AgenticEnabled:            agenticEnabled,
 	}
 }
 
@@ -67,6 +85,28 @@ func initAuthenticators(cfg *config.Config) (middleware.Authenticator, middlewar
 	webhookAuth := middleware.NewWebhookAuthenticator(cfg.AuthCfg.WebhookSecretKey)
 	apiKeyAuth := middleware.NewAPIKeyAuthenticator(cfg.AuthCfg.APIKeysKey)
 	return webhookAuth, apiKeyAuth
+}
+
+func initPublisher(cfg *config.Config) messaging.MessagePublisher {
+	if cfg.MessagingCfg != nil && cfg.MessagingCfg.Enabled {
+		publisher, err := messaging.NewRabbitMQPublisher(cfg.MessagingCfg.RabbitMQURL)
+		if err != nil {
+			panic(fmt.Sprintf("failed to connect to RabbitMQ: %v", err))
+		}
+		return publisher
+	}
+	return messaging.NewNoopPublisher()
+}
+
+func initPRCommentService(cfg *config.Config) ghintegration.PRCommentService {
+	if cfg.GitHubIntegrationCfg == nil || !cfg.GitHubIntegrationCfg.Enabled {
+		return ghintegration.NewPRCommentService("", false)
+	}
+	token := ""
+	if cfg.GitHubIntegrationCfg.TokenEnvVar != "" {
+		token = os.Getenv(cfg.GitHubIntegrationCfg.TokenEnvVar)
+	}
+	return ghintegration.NewPRCommentService(token, true)
 }
 
 func initAgenticService(

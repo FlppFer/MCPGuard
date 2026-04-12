@@ -19,6 +19,16 @@ auth:
   webhook_secret_key: "GITHUB_WEBHOOK_SECRET"
   api_keys_key: "MCPGUARD_API_KEYS"
 
+# Message queue configuration
+messaging:
+  enabled: true
+  rabbitmq_url: "amqp://guest:guest@rabbitmq:5672/"
+
+# GitHub PR integration
+github_integration:
+  enabled: true
+  token_env_var: "GITHUB_TOKEN"
+
 # Agentic (AI-based) analysis configuration
 agentic:
   enabled: true

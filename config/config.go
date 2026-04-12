@@ -11,12 +11,24 @@ var cfgFiles embed.FS
 
 type (
 	Config struct {
-		Scope            string               `yaml:"scope"`
-		LogLevel         string               `yaml:"log-level"`
-		DbCfg            *DatabaseConfig      `yaml:"data_base"`
-		ObjectStorageCfg *ObjectStorageConfig `yaml:"object_storage"`
-		AuthCfg          *AuthConfig          `yaml:"auth"`
-		AgenticCfg       *AgenticConfig       `yaml:"agentic"`
+		Scope                string                   `yaml:"scope"`
+		LogLevel             string                   `yaml:"log-level"`
+		DbCfg                *DatabaseConfig          `yaml:"data_base"`
+		ObjectStorageCfg     *ObjectStorageConfig     `yaml:"object_storage"`
+		AuthCfg              *AuthConfig              `yaml:"auth"`
+		AgenticCfg           *AgenticConfig           `yaml:"agentic"`
+		MessagingCfg         *MessagingConfig         `yaml:"messaging"`
+		GitHubIntegrationCfg *GitHubIntegrationConfig `yaml:"github_integration"`
+	}
+
+	MessagingConfig struct {
+		Enabled     bool   `yaml:"enabled"`
+		RabbitMQURL string `yaml:"rabbitmq_url"`
+	}
+
+	GitHubIntegrationConfig struct {
+		Enabled     bool   `yaml:"enabled"`
+		TokenEnvVar string `yaml:"token_env_var"`
 	}
 
 	AgenticConfig struct {

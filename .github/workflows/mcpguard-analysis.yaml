@@ -1,0 +1,60 @@
+name: MCPGuard Security Analysis
+
+on:
+  workflow_dispatch:
+    inputs:
+      repo_url:
+        description: "Repository URL to analyze"
+        required: true
+      branch:
+        description: "Branch to analyze"
+        required: false
+        default: "main"
+
+jobs:
+  analyze:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger MCPGuard Analysis
+        id: trigger
+        run: |
+          RESPONSE=$(curl -s -X POST "${{ secrets.MCPGUARD_API_URL }}/v1/analysis" \
+            -H "Content-Type: application/json" \
+            -H "X-API-Key: ${{ secrets.MCPGUARD_API_KEY }}" \
+            -H "X-Client-ID: ${{ secrets.MCPGUARD_CLIENT_ID }}" \
+            -d '{"repo_url": "${{ inputs.repo_url }}", "branch": "${{ inputs.branch }}"}')
+          ANALYSIS_ID=$(echo "$RESPONSE" | jq -r '.analysis_id')
+          echo "analysis_id=$ANALYSIS_ID" >> "$GITHUB_OUTPUT"
+          echo "Triggered analysis: $ANALYSIS_ID"
+
+      - name: Poll for Completion
+        run: |
+          ANALYSIS_ID="${{ steps.trigger.outputs.analysis_id }}"
+          for i in $(seq 1 60); do
+            STATUS=$(curl -s "${{ secrets.MCPGUARD_API_URL }}/v1/analysis/$ANALYSIS_ID/status" \
+              -H "X-API-Key: ${{ secrets.MCPGUARD_API_KEY }}" \
+              -H "X-Client-ID: ${{ secrets.MCPGUARD_CLIENT_ID }}" \
+              | jq -r '.status')
+            echo "Attempt $i: status=$STATUS"
+            if [[ "$STATUS" == "static_analysis_done" || "$STATUS" == "completed" ]]; then
+              echo "Analysis complete!"
+              break
+            fi
+            if [[ "$STATUS" == "failed" ]]; then
+              echo "Analysis failed!"
+              exit 1
+            fi
+            sleep 10
+          done
+
+      - name: Fetch Results
+        run: |
+          ANALYSIS_ID="${{ steps.trigger.outputs.analysis_id }}"
+          curl -s "${{ secrets.MCPGUARD_API_URL }}/v1/analysis/$ANALYSIS_ID/result" \
+            -H "X-API-Key: ${{ secrets.MCPGUARD_API_KEY }}" \
+            -H "X-Client-ID: ${{ secrets.MCPGUARD_CLIENT_ID }}" \
+            | jq '.' > results.json
+          echo "## Results"
+          cat results.json
+          FINDINGS=$(jq '.findings | length' results.json)
+          echo "Total findings: $FINDINGS"
