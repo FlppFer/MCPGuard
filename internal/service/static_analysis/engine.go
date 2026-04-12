@@ -10,6 +10,7 @@ import (
 
 	"github.com/FlppFer/MCPGuard/internal/model/services"
 	"github.com/FlppFer/MCPGuard/internal/service/model"
+	"github.com/FlppFer/MCPGuard/internal/service/static_analysis/languages/javascript"
 	"github.com/FlppFer/MCPGuard/internal/service/static_analysis/languages/python"
 )
 
@@ -103,6 +104,8 @@ func (e *engine) parseAST(file services.SourceFileDTO) (interface{}, error) {
 	switch file.Language {
 	case LanguagePython:
 		return python.ParsePythonSource(file.Path, []byte(file.Content))
+	case LanguageJavaScript:
+		return javascript.ParseJavaScriptSource(file.Path, []byte(file.Content))
 	default:
 		// For unsupported languages, return nil AST (rules may work with raw content)
 		return nil, nil

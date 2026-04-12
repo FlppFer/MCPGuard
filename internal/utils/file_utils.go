@@ -115,6 +115,10 @@ func isSupportedExt(ext string) bool {
 
 	switch ext {
 	case ".py",
+		".js",
+		".ts",
+		".jsx",
+		".tsx",
 		".json",
 		".yaml",
 		".yml",
@@ -132,6 +136,9 @@ func NormalizeExtension(ext string) string {
 	switch ext {
 	case ".py":
 		return "python"
+
+	case ".js", ".ts", ".jsx", ".tsx":
+		return "javascript"
 
 	case ".json":
 		return "json"

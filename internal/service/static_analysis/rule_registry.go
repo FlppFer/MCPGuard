@@ -14,5 +14,6 @@ func GetRules(language string) []model.Rule {
 
 // Define supported language constants and a slice for iteration/validation.
 const (
-	LanguagePython = "python"
+	LanguagePython     = "python"
+	LanguageJavaScript = "javascript"
 )
