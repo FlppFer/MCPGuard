@@ -1,6 +1,6 @@
 {
   "project": "MCPGuard",
-  "last_updated": "2026-04-04",
+  "last_updated": "2026-04-12",
   "phases": [
     {
       "id": "phase-1",
@@ -36,6 +36,11 @@
       "id": "phase-7",
       "name": "Multi-Language Rule Expansion",
       "status": "completed"
+    },
+    {
+      "id": "phase-8",
+      "name": "Testing — API Flows & Outcomes",
+      "status": "not_started"
     }
   ],
   "tasks": [
@@ -268,6 +273,46 @@
       "effort": "medium",
       "dependencies": [],
       "file": "task-7.1-js-ts-rules.md"
+    },
+    {
+      "id": "task-8.1",
+      "phase": "phase-8",
+      "title": "Controller Tests — Flows 1, 2, 3, 6 + Event Routing",
+      "status": "not_started",
+      "priority": "high",
+      "effort": "medium",
+      "dependencies": [],
+      "file": "task-test-plan-api-flows.md"
+    },
+    {
+      "id": "task-8.2",
+      "phase": "phase-8",
+      "title": "Controller Tests — Agentic Flows 7 & 8",
+      "status": "not_started",
+      "priority": "high",
+      "effort": "medium",
+      "dependencies": [],
+      "file": "task-test-plan-api-flows.md"
+    },
+    {
+      "id": "task-8.3",
+      "phase": "phase-8",
+      "title": "Service Tests — Agentic Analysis Service",
+      "status": "not_started",
+      "priority": "high",
+      "effort": "medium",
+      "dependencies": [],
+      "file": "task-test-plan-api-flows.md"
+    },
+    {
+      "id": "task-8.4",
+      "phase": "phase-8",
+      "title": "Service Tests — Git Webhook Service (queue, PR comments, core)",
+      "status": "not_started",
+      "priority": "high",
+      "effort": "medium",
+      "dependencies": [],
+      "file": "task-test-plan-api-flows.md"
     }
   ]
 }

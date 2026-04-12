@@ -5,10 +5,25 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 
 	"github.com/FlppFer/MCPGuard/internal/model/services"
 	"github.com/google/uuid"
 )
+
+// injectGitToken rewrites an HTTPS GitHub URL to include a token from
+// the GIT_AUTH_TOKEN env var, enabling cloning of private repositories.
+// If the env var is empty or the URL is not HTTPS, the URL is returned unchanged.
+func injectGitToken(repoURL string) string {
+	token := os.Getenv("GIT_AUTH_TOKEN")
+	if token == "" {
+		return repoURL
+	}
+	if strings.HasPrefix(repoURL, "https://") {
+		return strings.Replace(repoURL, "https://", "https://x-access-token:"+token+"@", 1)
+	}
+	return repoURL
+}
 
 func DownloadRepo(repoURL, branch, commit string) (*services.RepoDownloadResultDTO, error) {
 	analysisID := uuid.NewString()
@@ -24,8 +39,11 @@ func DownloadRepo(repoURL, branch, commit string) (*services.RepoDownloadResultD
 	// Remove repoDir if it exists (cleanup from previous failed attempt)
 	_ = os.RemoveAll(repoDir)
 
+	// Inject auth token for private repos if GIT_AUTH_TOKEN is set
+	cloneURL := injectGitToken(repoURL)
+
 	// Clone whole repo (shallow)
-	cloneCmd := exec.Command("git", "clone", "--depth", "1", repoURL, repoDir)
+	cloneCmd := exec.Command("git", "clone", "--depth", "1", cloneURL, repoDir)
 	cloneCmd.Stdout = os.Stdout
 	cloneCmd.Stderr = os.Stderr
 

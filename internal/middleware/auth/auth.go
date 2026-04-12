@@ -65,6 +65,11 @@ func WebhookAuth(auth Authenticator) func(http.Handler) http.Handler {
 
 // Context helpers
 
+// WithGitHubEvent injects a GitHub event name into the context. Used in tests.
+func WithGitHubEvent(ctx context.Context, event string) context.Context {
+	return context.WithValue(ctx, GitHubEventContextKey, event)
+}
+
 func GetGitHubEventFromContext(ctx context.Context) string {
 	if event, ok := ctx.Value(GitHubEventContextKey).(string); ok {
 		return event

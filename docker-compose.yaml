@@ -11,8 +11,13 @@ services:
       - SCOPE=local
       - GITHUB_WEBHOOK_SECRET=${GITHUB_WEBHOOK_SECRET:-default-webhook-secret}
       - MCPGUARD_API_KEYS=${MCPGUARD_API_KEYS:-dev-client:dev-key}
+      - LOCALSTACK_ENDPOINT=http://localstack:4566
+      - GIT_AUTH_TOKEN=${GIT_AUTH_TOKEN:-}
     volumes:
       - mcpguard-storage:/app/mcpguard-local-storage
+    depends_on:
+      localstack:
+        condition: service_healthy
     restart: unless-stopped
 
   rabbitmq:
@@ -50,19 +55,47 @@ services:
     profiles:
       - queue
 
+  cadvisor:
+    image: gcr.io/cadvisor/cadvisor:latest
+    ports:
+      - "8081:8080"
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:ro
+      - /sys:/sys:ro
+      - /var/lib/docker/:/var/lib/docker:ro
+    privileged: true
+    profiles:
+      - observability
+
+  node-exporter:
+    image: prom/node-exporter:latest
+    ports:
+      - "9100:9100"
+    command:
+      - '--path.rootfs=/host'
+    volumes:
+      - /:/host:ro
+    profiles:
+      - observability
+
   prometheus:
     image: prom/prometheus:latest
     volumes:
       - ./deploy/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
     ports:
       - "9090:9090"
+    depends_on:
+      - cadvisor
+      - node-exporter
     profiles:
       - observability
 
   grafana:
     image: grafana/grafana:latest
     volumes:
-      - ./deploy/grafana/provisioning:/etc/grafana/provisioning
+      - ./deploy/grafana/provisioning/datasources.yaml:/etc/grafana/provisioning/datasources/datasources.yaml
+      - ./deploy/grafana/provisioning/dashboards.yaml:/etc/grafana/provisioning/dashboards/dashboards.yaml
       - ./deploy/grafana/dashboards:/var/lib/grafana/dashboards
     ports:
       - "3000:3000"
@@ -76,7 +109,7 @@ services:
       - observability
 
   localstack:
-    image: localstack/localstack:latest
+    image: localstack/localstack:3.8
     ports:
       - "4566:4566"
     environment:
@@ -84,8 +117,11 @@ services:
       - DEFAULT_REGION=us-east-1
     volumes:
       - localstack-data:/var/lib/localstack
-    profiles:
-      - s3-testing
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:4566/_localstack/health"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
 
 volumes:
   mcpguard-storage:

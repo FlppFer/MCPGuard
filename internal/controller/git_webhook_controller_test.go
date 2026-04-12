@@ -6,11 +6,13 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/go-chi/chi/v5"
 
+	authMiddleware "github.com/FlppFer/MCPGuard/internal/middleware/auth"
 	"github.com/FlppFer/MCPGuard/internal/model/services"
 	"github.com/FlppFer/MCPGuard/internal/service"
 )
@@ -324,5 +326,310 @@ func TestGetAnalysisResult_MissingID(t *testing.T) {
 
 	if response["error"] != "missing_id" {
 		t.Errorf("expected error=missing_id, got %v", response["error"])
+	}
+}
+
+// --- Flow A: StartAnalysis (POST /v1/analysis) ---
+
+func TestStartAnalysis(t *testing.T) {
+	tests := []struct {
+		name           string
+		body           string
+		mockFunc       func(ctx context.Context, repoURL, branch, commit string) (*services.GitWebhookAnalysisResultDTO, error)
+		expectedStatus int
+		expectedBody   map[string]interface{}
+	}{
+		{
+			name: "A1 - happy path",
+			body: `{"repo_url":"https://github.com/test/repo.git","branch":"main"}`,
+			mockFunc: func(ctx context.Context, repoURL, branch, commit string) (*services.GitWebhookAnalysisResultDTO, error) {
+				return &services.GitWebhookAnalysisResultDTO{
+					AnalysisID: "new-analysis-id",
+					Status:     "static_analysis_running",
+				}, nil
+			},
+			expectedStatus: http.StatusAccepted,
+			expectedBody:   map[string]interface{}{"analysis_id": "new-analysis-id", "status": "static_analysis_running"},
+		},
+		{
+			name:           "A2 - malformed JSON",
+			body:           `{bad json`,
+			mockFunc:       nil,
+			expectedStatus: http.StatusBadRequest,
+			expectedBody:   map[string]interface{}{"error": ErrCodeInvalidRequest},
+		},
+		{
+			name:           "A3 - missing repo_url",
+			body:           `{"branch":"main"}`,
+			mockFunc:       nil,
+			expectedStatus: http.StatusBadRequest,
+			expectedBody:   map[string]interface{}{"error": ErrCodeMissingField},
+		},
+		{
+			name: "A4 - service error",
+			body: `{"repo_url":"https://github.com/test/repo.git"}`,
+			mockFunc: func(ctx context.Context, repoURL, branch, commit string) (*services.GitWebhookAnalysisResultDTO, error) {
+				return nil, fmt.Errorf("git clone failed: exit status 128")
+			},
+			expectedStatus: http.StatusInternalServerError,
+			expectedBody:   map[string]interface{}{"error": ErrCodeAnalysisFailed},
+		},
+		{
+			name: "A5 - defaults branch to main when empty",
+			body: `{"repo_url":"https://github.com/test/repo.git"}`,
+			mockFunc: func(ctx context.Context, repoURL, branch, commit string) (*services.GitWebhookAnalysisResultDTO, error) {
+				if branch != "main" {
+					return nil, fmt.Errorf("expected branch=main, got %s", branch)
+				}
+				return &services.GitWebhookAnalysisResultDTO{AnalysisID: "id-1", Status: "static_analysis_running"}, nil
+			},
+			expectedStatus: http.StatusAccepted,
+			expectedBody:   map[string]interface{}{"analysis_id": "id-1"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			svc := &mockGitWebhookService{requestAnalysisFunc: tt.mockFunc}
+			ctrl := NewGitWebhookController(svc)
+
+			req := httptest.NewRequest(http.MethodPost, "/v1/analysis", strings.NewReader(tt.body))
+			req.Header.Set("Content-Type", "application/json")
+			rec := httptest.NewRecorder()
+
+			ctrl.StartAnalysis().ServeHTTP(rec, req)
+
+			assertStatus(t, tt.expectedStatus, rec.Code)
+			assertBodyContains(t, tt.expectedBody, rec.Body.Bytes())
+		})
+	}
+}
+
+// --- Flow B: Push Webhook (HandleGitHubWebhook with push event) ---
+
+func withGitHubEvent(req *http.Request, event string) *http.Request {
+	ctx := authMiddleware.WithGitHubEvent(req.Context(), event)
+	return req.WithContext(ctx)
+}
+
+func TestHandleGitHubWebhook_Push(t *testing.T) {
+	validPush := `{"ref":"refs/heads/main","after":"abc123","before":"000000","repository":{"clone_url":"https://github.com/test/repo.git","full_name":"test/repo"}}`
+
+	tests := []struct {
+		name           string
+		body           string
+		mockFunc       func(ctx context.Context, repoURL, branch, commit string) (*services.GitWebhookAnalysisResultDTO, error)
+		expectedStatus int
+		expectedBody   map[string]interface{}
+	}{
+		{
+			name: "B1 - happy path push",
+			body: validPush,
+			mockFunc: func(ctx context.Context, repoURL, branch, commit string) (*services.GitWebhookAnalysisResultDTO, error) {
+				return &services.GitWebhookAnalysisResultDTO{AnalysisID: "push-id", Status: "static_analysis_running"}, nil
+			},
+			expectedStatus: http.StatusAccepted,
+			expectedBody:   map[string]interface{}{"analysis_id": "push-id"},
+		},
+		{
+			name:           "B2 - malformed push payload",
+			body:           `{bad json`,
+			mockFunc:       nil,
+			expectedStatus: http.StatusBadRequest,
+			expectedBody:   map[string]interface{}{"error": ErrCodeInvalidPayload},
+		},
+		{
+			name:           "B3 - missing clone_url",
+			body:           `{"ref":"refs/heads/main","repository":{"clone_url":"","full_name":"test/repo"}}`,
+			mockFunc:       nil,
+			expectedStatus: http.StatusBadRequest,
+			expectedBody:   map[string]interface{}{"error": ErrCodeMissingField},
+		},
+		{
+			name: "B4 - service error",
+			body: validPush,
+			mockFunc: func(ctx context.Context, repoURL, branch, commit string) (*services.GitWebhookAnalysisResultDTO, error) {
+				return nil, fmt.Errorf("git clone failed")
+			},
+			expectedStatus: http.StatusInternalServerError,
+			expectedBody:   map[string]interface{}{"error": ErrCodeAnalysisFailed},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			svc := &mockGitWebhookService{requestAnalysisFunc: tt.mockFunc}
+			ctrl := NewGitWebhookController(svc)
+
+			req := httptest.NewRequest(http.MethodPost, "/v1/webhook/github", strings.NewReader(tt.body))
+			req = withGitHubEvent(req, "push")
+			rec := httptest.NewRecorder()
+
+			ctrl.HandleGitHubWebhook().ServeHTTP(rec, req)
+
+			assertStatus(t, tt.expectedStatus, rec.Code)
+			assertBodyContains(t, tt.expectedBody, rec.Body.Bytes())
+		})
+	}
+}
+
+// --- Flow C: PR Webhook ---
+
+func TestHandleGitHubWebhook_PullRequest(t *testing.T) {
+	validPR := `{"action":"opened","number":42,"pull_request":{"head":{"ref":"feature/branch","sha":"deadbeef"}},"repository":{"clone_url":"https://github.com/test/repo.git","full_name":"test/repo"}}`
+
+	tests := []struct {
+		name           string
+		body           string
+		mockFunc       func(ctx context.Context, repoURL, branch, commit string) (*services.GitWebhookAnalysisResultDTO, error)
+		expectedStatus int
+		expectedBody   map[string]interface{}
+	}{
+		{
+			name: "C1 - happy path PR opened",
+			body: validPR,
+			mockFunc: func(ctx context.Context, repoURL, branch, commit string) (*services.GitWebhookAnalysisResultDTO, error) {
+				return &services.GitWebhookAnalysisResultDTO{AnalysisID: "pr-id", Status: "static_analysis_running"}, nil
+			},
+			expectedStatus: http.StatusAccepted,
+			expectedBody:   map[string]interface{}{"analysis_id": "pr-id"},
+		},
+		{
+			name:           "C2 - malformed PR payload",
+			body:           `{bad}`,
+			mockFunc:       nil,
+			expectedStatus: http.StatusBadRequest,
+			expectedBody:   map[string]interface{}{"error": ErrCodeInvalidPayload},
+		},
+		{
+			name:           "C3 - ignored PR action (closed)",
+			body:           `{"action":"closed","number":1,"pull_request":{"head":{"ref":"main","sha":"abc"}},"repository":{"clone_url":"https://github.com/test/repo.git","full_name":"test/repo"}}`,
+			mockFunc:       nil,
+			expectedStatus: http.StatusOK,
+			expectedBody:   map[string]interface{}{"status": "ignored"},
+		},
+		{
+			name: "C4 - service error on PR",
+			body: validPR,
+			mockFunc: func(ctx context.Context, repoURL, branch, commit string) (*services.GitWebhookAnalysisResultDTO, error) {
+				return nil, fmt.Errorf("clone failed")
+			},
+			expectedStatus: http.StatusInternalServerError,
+			expectedBody:   map[string]interface{}{"error": ErrCodeAnalysisFailed},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			svc := &mockGitWebhookService{requestAnalysisFunc: tt.mockFunc}
+			ctrl := NewGitWebhookController(svc)
+
+			req := httptest.NewRequest(http.MethodPost, "/v1/webhook/github", strings.NewReader(tt.body))
+			req = withGitHubEvent(req, "pull_request")
+			rec := httptest.NewRecorder()
+
+			ctrl.HandleGitHubWebhook().ServeHTTP(rec, req)
+
+			assertStatus(t, tt.expectedStatus, rec.Code)
+			assertBodyContains(t, tt.expectedBody, rec.Body.Bytes())
+		})
+	}
+}
+
+// --- Flow E: Unknown/empty webhook event ---
+
+func TestHandleGitHubWebhook_UnknownEvent(t *testing.T) {
+	ctrl := NewGitWebhookController(&mockGitWebhookService{})
+
+	for _, event := range []string{"", "ping", "star", "release"} {
+		t.Run("event="+event, func(t *testing.T) {
+			req := httptest.NewRequest(http.MethodPost, "/v1/webhook/github", strings.NewReader(`{}`))
+			req = withGitHubEvent(req, event)
+			rec := httptest.NewRecorder()
+
+			ctrl.HandleGitHubWebhook().ServeHTTP(rec, req)
+
+			assertStatus(t, http.StatusOK, rec.Code)
+			assertBodyContains(t, map[string]interface{}{"status": "ignored"}, rec.Body.Bytes())
+		})
+	}
+}
+
+// --- Flow F: GetMergedResult (GET /v1/analysis/{id}/result/full) ---
+
+func TestGetMergedResult(t *testing.T) {
+	tests := []struct {
+		name           string
+		analysisID     string
+		mockFunc       func(ctx context.Context, analysisID string) (*services.MergedAnalysisResultDTO, error)
+		expectedStatus int
+		expectedBody   map[string]interface{}
+	}{
+		{
+			name:       "F1 - happy path returns merged result",
+			analysisID: "merged-id",
+			mockFunc: func(ctx context.Context, analysisID string) (*services.MergedAnalysisResultDTO, error) {
+				return &services.MergedAnalysisResultDTO{
+					AnalysisID: "merged-id",
+					Status:     "completed",
+				}, nil
+			},
+			expectedStatus: http.StatusOK,
+			expectedBody:   map[string]interface{}{"analysis_id": "merged-id", "status": "completed"},
+		},
+		{
+			name:       "F2 - analysis not found",
+			analysisID: "missing",
+			mockFunc: func(ctx context.Context, analysisID string) (*services.MergedAnalysisResultDTO, error) {
+				return nil, fmt.Errorf("%w", service.ErrAnalysisNotFound)
+			},
+			expectedStatus: http.StatusNotFound,
+			expectedBody:   map[string]interface{}{"error": ErrCodeNotFound},
+		},
+		{
+			name:       "F3 - analysis not complete yet",
+			analysisID: "pending",
+			mockFunc: func(ctx context.Context, analysisID string) (*services.MergedAnalysisResultDTO, error) {
+				return nil, fmt.Errorf("%w, current status: static_done", service.ErrAnalysisNotComplete)
+			},
+			expectedStatus: http.StatusAccepted,
+			expectedBody:   map[string]interface{}{"error": ErrCodeAnalysisPending},
+		},
+		{
+			name:           "F4 - missing ID",
+			analysisID:     "",
+			mockFunc:       nil,
+			expectedStatus: http.StatusBadRequest,
+			expectedBody:   map[string]interface{}{"error": ErrCodeMissingID},
+		},
+		{
+			name:       "F5 - internal error",
+			analysisID: "err-id",
+			mockFunc: func(ctx context.Context, analysisID string) (*services.MergedAnalysisResultDTO, error) {
+				return nil, fmt.Errorf("unexpected db error")
+			},
+			expectedStatus: http.StatusInternalServerError,
+			expectedBody:   map[string]interface{}{"error": ErrCodeInternalError},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			svc := &mockGitWebhookService{getMergedResultFunc: tt.mockFunc}
+			ctrl := NewGitWebhookController(svc)
+
+			req := httptest.NewRequest(http.MethodGet, "/v1/analysis/"+tt.analysisID+"/result/full", nil)
+			rctx := chi.NewRouteContext()
+			if tt.analysisID != "" {
+				rctx.URLParams.Add("id", tt.analysisID)
+			}
+			req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, rctx))
+			rec := httptest.NewRecorder()
+
+			ctrl.GetMergedResult().ServeHTTP(rec, req)
+
+			assertStatus(t, tt.expectedStatus, rec.Code)
+			assertBodyContains(t, tt.expectedBody, rec.Body.Bytes())
+		})
 	}
 }
