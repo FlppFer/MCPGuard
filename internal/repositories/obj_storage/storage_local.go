@@ -4,53 +4,45 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"os"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	awsconfig "github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/credentials"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
-	"github.com/elgohr/go-localstack"
 )
-
-// LocalStackStorage wraps S3Storage with a LocalStack instance for local development
-type LocalStackStorage struct {
-	*S3Storage
-	instance *localstack.Instance
-	bucket   string
-}
 
 const (
-	LocalStackErrorMessage = "Failed to create LocalStack instance"
+	defaultLocalStackEndpoint = "http://localhost:4566"
+	defaultLocalStackRegion   = "us-east-1"
+	envLocalStackEndpoint     = "LOCALSTACK_ENDPOINT"
 )
 
-// NewLocalStorage creates a LocalStack-backed S3 storage for local development.
-// It starts a LocalStack Docker container and creates the specified bucket.
+// LocalStackStorage wraps S3Storage for use with an externally-running LocalStack container.
+type LocalStackStorage struct {
+	*S3Storage
+	bucket   string
+	endpoint string
+}
+
+// NewLocalStorage connects to an already-running LocalStack container and creates the bucket if needed.
+// The LocalStack endpoint defaults to http://localhost:4566 but can be overridden with LOCALSTACK_ENDPOINT.
 func NewLocalStorage(bucket string) (*LocalStackStorage, error) {
 	ctx := context.Background()
 
-	instance, err := localstack.NewInstance()
-	if err != nil {
-		slog.Error(LocalStackErrorMessage, "error", err)
-		return nil, fmt.Errorf("%s: %w", LocalStackErrorMessage, err)
+	endpoint := os.Getenv(envLocalStackEndpoint)
+	if endpoint == "" {
+		endpoint = defaultLocalStackEndpoint
 	}
 
-	if err := instance.Start(); err != nil {
-		slog.Error("Failed to start LocalStack", "error", err)
-		return nil, fmt.Errorf("%s: %w", LocalStackErrorMessage, err)
-	}
+	slog.Info("Connecting to external LocalStack", "endpoint", endpoint, "bucket", bucket)
 
-	endpoint := instance.EndpointV2(localstack.S3)
-	slog.Info("LocalStack S3 started", "endpoint", endpoint, "bucket", bucket)
-
-	// Create S3 client for bucket creation
 	cfg, err := awsconfig.LoadDefaultConfig(ctx,
-		awsconfig.WithRegion("us-east-1"),
+		awsconfig.WithRegion(defaultLocalStackRegion),
 		awsconfig.WithCredentialsProvider(credentials.NewStaticCredentialsProvider("test", "test", "")),
 	)
 	if err != nil {
-		instance.Stop()
-		slog.Error("Failed to load AWS config", "error", err)
-		return nil, fmt.Errorf("%s: %w", LocalStackErrorMessage, err)
+		return nil, fmt.Errorf("failed to load AWS config for LocalStack: %w", err)
 	}
 
 	s3Client := s3.NewFromConfig(cfg, func(o *s3.Options) {
@@ -58,7 +50,7 @@ func NewLocalStorage(bucket string) (*LocalStackStorage, error) {
 		o.UsePathStyle = true
 	})
 
-	// Create the bucket
+	// Create the bucket (ignore error if it already exists)
 	_, err = s3Client.CreateBucket(ctx, &s3.CreateBucketInput{
 		Bucket: aws.String(bucket),
 	})
@@ -66,34 +58,21 @@ func NewLocalStorage(bucket string) (*LocalStackStorage, error) {
 		slog.Warn("Bucket creation failed (may already exist)", "bucket", bucket, "error", err)
 	}
 
-	// Create S3Storage pointing to LocalStack
-	s3Storage, err := NewS3Storage(ctx, bucket, endpoint, "us-east-1", true)
+	s3Storage, err := NewS3Storage(ctx, bucket, endpoint, defaultLocalStackRegion, true)
 	if err != nil {
-		instance.Stop()
-		slog.Error("Failed to create S3Storage", "error", err)
-		return nil, fmt.Errorf("%s: %w", LocalStackErrorMessage, err)
+		return nil, fmt.Errorf("failed to create S3Storage for LocalStack: %w", err)
 	}
+
+	slog.Info("LocalStack S3 storage ready", "endpoint", endpoint, "bucket", bucket)
 
 	return &LocalStackStorage{
 		S3Storage: s3Storage,
-		instance:  instance,
 		bucket:    bucket,
+		endpoint:  endpoint,
 	}, nil
 }
 
-// Stop gracefully shuts down the LocalStack container
-func (l *LocalStackStorage) Stop() error {
-	if l.instance != nil {
-		slog.Info("Stopping LocalStack instance")
-		return l.instance.Stop()
-	}
-	return nil
-}
-
-// Endpoint returns the LocalStack S3 endpoint URL
+// Endpoint returns the LocalStack S3 endpoint URL.
 func (l *LocalStackStorage) Endpoint() string {
-	if l.instance != nil {
-		return l.instance.EndpointV2(localstack.S3)
-	}
-	return ""
+	return l.endpoint
 }
