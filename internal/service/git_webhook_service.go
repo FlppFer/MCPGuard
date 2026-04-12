@@ -359,11 +359,13 @@ func (uc *gitWebhookServiceImpl) publishAnalysisJob(
 	analysisID, repoURL, branch, commit string,
 ) error {
 	jobMsg := &messaging.AnalysisJobMessage{
-		AnalysisID: analysisID,
-		RepoURL:    repoURL,
-		Branch:     branch,
-		Commit:     commit,
-		SourceKey:  fmt.Sprintf(S3KeySourceArchive, analysisID),
+		AnalysisID:   analysisID,
+		RepoURL:      repoURL,
+		Branch:       branch,
+		Commit:       commit,
+		SourceKey:    fmt.Sprintf(S3KeySourceArchive, analysisID),
+		PRNumber:     entity.PRNumber,
+		RepoFullName: entity.RepoFullName,
 	}
 	msgBytes, err := json.Marshal(jobMsg)
 	if err != nil {

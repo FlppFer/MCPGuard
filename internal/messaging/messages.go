@@ -8,9 +8,11 @@ const (
 
 // AnalysisJobMessage is published to the static analysis queue.
 type AnalysisJobMessage struct {
-	AnalysisID string `json:"analysis_id"`
-	RepoURL    string `json:"repo_url"`
-	Branch     string `json:"branch"`
-	Commit     string `json:"commit"`
-	SourceKey  string `json:"source_key"`
+	AnalysisID   string `json:"analysis_id"`
+	RepoURL      string `json:"repo_url"`
+	Branch       string `json:"branch"`
+	Commit       string `json:"commit"`
+	SourceKey    string `json:"source_key"`
+	PRNumber     int    `json:"pr_number,omitempty"`
+	RepoFullName string `json:"repo_full_name,omitempty"`
 }

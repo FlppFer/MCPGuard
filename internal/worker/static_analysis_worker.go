@@ -20,19 +20,21 @@ import (
 	"github.com/FlppFer/MCPGuard/internal/repositories/db"
 	"github.com/FlppFer/MCPGuard/internal/repositories/obj_storage"
 	"github.com/FlppFer/MCPGuard/internal/service"
+	ghintegration "github.com/FlppFer/MCPGuard/internal/service/github_integration"
 	"github.com/FlppFer/MCPGuard/internal/service/static_analysis"
 	"github.com/FlppFer/MCPGuard/internal/utils"
 )
 
 // StaticAnalysisWorker consumes analysis jobs from a RabbitMQ queue and processes them.
 type StaticAnalysisWorker struct {
-	conn        *amqp.Connection
-	channel     *amqp.Channel
-	dbRepo      db.DatabaseClient
-	storageRepo obj_storage.StorageRepository
-	analyzer    static_analysis.Service
-	agenticSvc  service.AgenticAnalysisService
-	agenticOn   bool
+	conn             *amqp.Connection
+	channel          *amqp.Channel
+	dbRepo           db.DatabaseClient
+	storageRepo      obj_storage.StorageRepository
+	analyzer         static_analysis.Service
+	agenticSvc       service.AgenticAnalysisService
+	agenticOn        bool
+	prCommentService ghintegration.PRCommentService
 }
 
 // NewStaticAnalysisWorker creates a new worker connected to the given RabbitMQ URL.
@@ -43,6 +45,7 @@ func NewStaticAnalysisWorker(
 	analyzer static_analysis.Service,
 	agenticSvc service.AgenticAnalysisService,
 	agenticOn bool,
+	prCommentService ghintegration.PRCommentService,
 ) (*StaticAnalysisWorker, error) {
 	conn, err := amqp.Dial(rabbitURL)
 	if err != nil {
@@ -70,13 +73,14 @@ func NewStaticAnalysisWorker(
 	}
 
 	return &StaticAnalysisWorker{
-		conn:        conn,
-		channel:     ch,
-		dbRepo:      dbRepo,
-		storageRepo: storageRepo,
-		analyzer:    analyzer,
-		agenticSvc:  agenticSvc,
-		agenticOn:   agenticOn,
+		conn:             conn,
+		channel:          ch,
+		dbRepo:           dbRepo,
+		storageRepo:      storageRepo,
+		analyzer:         analyzer,
+		agenticSvc:       agenticSvc,
+		agenticOn:        agenticOn,
+		prCommentService: prCommentService,
 	}, nil
 }
 
@@ -201,7 +205,14 @@ func (w *StaticAnalysisWorker) processJob(ctx context.Context, job *messaging.An
 	w.dbRepo.Update(ctx, entity)
 	metrics.AnalysesTotal.WithLabelValues("worker", "success").Inc()
 
-	// 7. Optionally trigger agentic analysis
+	// 7. Post PR comment if this was triggered by a pull_request event
+	if job.PRNumber > 0 && w.prCommentService != nil {
+		if err := w.prCommentService.PostFindings(ctx, job.RepoFullName, job.PRNumber, result); err != nil {
+			slog.Warn("Worker: failed to post PR comment", "analysis_id", job.AnalysisID, "error", err)
+		}
+	}
+
+	// 8. Optionally trigger agentic analysis
 	if w.agenticOn {
 		w.submitAgentic(ctx, entity, job)
 	}

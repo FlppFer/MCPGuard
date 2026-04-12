@@ -31,6 +31,7 @@ type (
 		StorageClient             obj_storage.StorageRepository
 		AgenticService            service.AgenticAnalysisService
 		AgenticEnabled            bool
+		PRCommentService          ghintegration.PRCommentService
 	}
 )
 
@@ -54,6 +55,7 @@ func Bootstrap(ctx context.Context, cfg *config.Config) *Resources {
 		StorageClient:             osClient,
 		AgenticService:            agenticService,
 		AgenticEnabled:            agenticEnabled,
+		PRCommentService:          prCommentService,
 	}
 }
 

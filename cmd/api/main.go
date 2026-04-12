@@ -109,6 +109,7 @@ func runWorker(ctx context.Context, cfg *config.Config) error {
 		analyzer,
 		resources.AgenticService,
 		resources.AgenticEnabled,
+		resources.PRCommentService,
 	)
 	if err != nil {
 		return fmt.Errorf("failed to create worker: %w", err)
