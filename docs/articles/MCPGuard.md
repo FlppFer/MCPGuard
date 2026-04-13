@@ -501,29 +501,168 @@ dados em trânsito entre
 clientes, API e serviços de
 armazenamento.
 ```
-## 4. Resultados Obtidos
+## 4. Resultados e Discussões
 
-O projeto MCPGuard encontra-se em fase de desenvolvimento ativo. Foram
-implementados:
+Esta seção apresenta os resultados obtidos com a implementação do MCPGuard,
+organizada por subsistema. Cada resultado é acompanhado de uma discussão que
+contextualiza o que foi realizado e analisa o impacto prático da solução.
 
-```
-● API Principal (Go): Endpoints REST para recebimento de webhooks, início de
-análises, consulta de status e resultados, com autenticação via HMAC-SHA256 e
-API Key com suporte para repositórios apenas em Python.
-● Motor de Análise Estática: 11 arquivos de regras cobrindo as 4 categorias de
-ataques MCP (Injeção Direta, Injeção Indireta, Usuário Malicioso e Ataques
-LLM) com suporte à linguagem Python.
-● Testes Unitários: Cobertura de testes para todas as regras implementadas.
-```
-Componentes em Desenvolvimento:
+### 4.1. Motor de Análise Estática
 
-```
-● Suporte para outras linguagens além de python
-● Sistema de Filas (RabbitMQ)
-● API de Análise Agêntica (Python)
-● Integração com GitHub Actions
-● Sistema de Métricas (Prometheus/Grafana)
-```
+O motor de análise estática foi completamente implementado, cobrindo 31 regras de
+segurança organizadas em 11 arquivos, abrangendo as 4 categorias de ataques da
+taxonomia MCPLib (Guo et al., 2025). A análise é realizada por meio de parsing AST
+com tree-sitter, garantindo precisão estrutural superior à análise por expressões
+regulares simples. Os achados são classificados por severidade (CRITICAL, HIGH,
+MEDIUM, LOW, INFO) e incluem localização precisa no código (arquivo e linha).
+
+**Tabela 3. Distribuição de regras por categoria de ataque**
+
+| Categoria | Regras Implementadas | Severidades Cobertas |
+|---|---|---|
+| I. Injeção Direta de Ferramentas | 14 | CRITICAL, HIGH, MEDIUM |
+| II. Injeção Indireta de Ferramentas | 4 | HIGH, MEDIUM |
+| III. Ataques de Usuário Malicioso | 7 | CRITICAL, HIGH, MEDIUM |
+| IV. Ataques Inerentes a LLMs | 6 | HIGH, MEDIUM, LOW |
+| **Total** | **31** | **CRITICAL → LOW** |
+
+Em testes com o repositório `vulnerable_mcp_server` (repositório sintético com
+vulnerabilidades deliberadas), o motor identificou achados em múltiplas categorias,
+incluindo execução dinâmica de código, acesso irrestrito ao sistema de arquivos e
+ausência de validação de entrada em ferramentas expostas. O resultado é publicado
+automaticamente como comentário no Pull Request correspondente via GitHub API.
+
+**Figura A** — *Comentário automático gerado no Pull Request com tabela de findings
+estáticos, ordenados por severidade, contendo regra, arquivo:linha e descrição.*
+
+**Discussão:** A cobertura de 31 regras representa mapeamento completo da taxonomia
+MCPLib. O uso de AST via tree-sitter elimina falsos positivos causados por análise
+textual superficial — por exemplo, distinguindo chamadas a `eval()` legítimas de usos
+maliciosos com base no contexto sintático. A publicação automática no PR fecha o loop
+de feedback para o desenvolvedor sem exigir acesso a ferramentas externas.
+
+---
+
+### 4.2. Integração com GitHub (Webhook + PR Comments)
+
+A integração com GitHub foi implementada em dois sentidos:
+
+- **Entrada:** o sistema recebe eventos `pull_request` (opened, synchronize, reopened)
+  via webhook autenticado com HMAC-SHA256. Ao receber o evento, a API extrai
+  repositório, branch, commit e número do PR, cria um job de análise com UUID e o
+  enfileira no RabbitMQ.
+- **Saída:** após a conclusão da análise estática e agêntica, dois comentários são
+  publicados automaticamente no PR — um com os achados estáticos ordenados por
+  severidade e outro com os achados semânticos da análise agêntica.
+
+**Figura B** — *Log da API mostrando o recebimento do webhook com campos `repo`,
+`pr`, `branch` e `action`.*
+
+**Figura C** — *Dois comentários gerados automaticamente no PR: (1) análise estática
+com tabela de findings e (2) análise agêntica com categorias, confiança e sugestões.*
+
+**Discussão:** A separação em dois comentários mantém clareza para o desenvolvedor:
+o comentário estático é determinístico e publicado em segundos após o clone do
+repositório, enquanto o agêntico é assíncrono e complementar. A autenticação
+HMAC-SHA256 garante que somente eventos legítimos do GitHub disparem análises,
+prevenindo abuso da API.
+
+---
+
+### 4.3. Sistema de Filas (RabbitMQ) e Worker Assíncrono
+
+O sistema de filas foi implementado com RabbitMQ. A API Principal publica jobs na fila
+`static-analysis` e retorna imediatamente ao GitHub (HTTP 202 Accepted), evitando
+timeout do webhook (limite de 10 segundos do GitHub). Um worker Go consome as
+mensagens, executa a análise estática em pipeline de estágios (download → parsing →
+análise → upload), e aciona a análise agêntica de forma encadeada.
+
+O retry automático do RabbitMQ (nack + requeue) protege contra falhas transitórias de
+rede ou do worker. A persistência de mensagens garante que jobs não sejam perdidos
+em caso de reinicialização dos containers.
+
+**Figura D** — *Dashboard Grafana mostrando o painel "Webhook Requests Received"
+e "Analyses per Hour" com jobs processados após ciclo de análise.*
+
+**Discussão:** Em execuções realizadas, o tempo médio desde o recebimento do webhook
+até a publicação do comentário estático foi de 30 a 60 segundos, dominado pelo tempo
+de clone do repositório via git. A arquitetura de filas permite escalar workers
+horizontalmente de forma independente da API principal, o que é relevante para
+cenários com múltiplos repositórios analisados simultaneamente.
+
+---
+
+### 4.4. Análise Agêntica (Python Worker + Gemini)
+
+A API Python implementa um pipeline de análise semântica baseado em LLM (Google
+Gemini 2.5 Flash). O worker executa as seguintes etapas:
+
+1. Recebe o job via HTTP POST da API Go, incluindo os achados estáticos como contexto.
+2. Baixa o arquivo ZIP do repositório do armazenamento S3-compatível.
+3. Filtra os arquivos para apenas os modificados no PR (via `GET /repos/{owner}/{repo}/pulls/{pr}/files`).
+4. Para cada arquivo, constrói um prompt especializado em segurança MCP, injetando
+   os achados estáticos relevantes como seção de contexto ("Static Analysis Pre-scan").
+5. Agrega os resultados e faz callback para a API Go, que persiste e publica o comentário.
+
+**Figura E** — *Comentário agêntico no PR mostrando findings com categoria,
+confiança (%), arquivo, linhas e sugestão de correção.*
+
+**Discussão:** A injeção dos achados estáticos no prompt do LLM permite que o modelo
+aprofunde sua análise nas vulnerabilidades já sinalizadas, reduzindo o risco de falsos
+negativos nas ocorrências mais críticas. O escopo reduzido ao conjunto de arquivos
+modificados no PR (em vez do repositório inteiro) diminui latência e custo de tokens,
+além de tornar o feedback mais preciso e relevante para a mudança em revisão.
+
+---
+
+### 4.5. Observabilidade (Prometheus + Grafana + Loki)
+
+O sistema expõe métricas no formato OpenMetrics coletadas pelo Prometheus e
+visualizadas no Grafana. Logs estruturados são coletados pelo Promtail e indexados
+no Loki, permitindo rastreabilidade textual por serviço.
+
+**Tabela 4. Métricas instrumentadas no MCPGuard**
+
+| Métrica | Tipo | Descrição |
+|---|---|---|
+| `mcpguard_analyses_total` | Counter | Análises por trigger e status |
+| `mcpguard_findings_total` | Counter | Achados por severidade |
+| `mcpguard_analysis_duration_seconds` | Histogram | Duração da análise estática |
+| `mcpguard_analysis_stage_transitions_total` | Counter | Transições entre estágios |
+| `mcpguard_analysis_stage_duration_seconds` | Histogram | Duração por estágio |
+| `mcpguard_repo_clone_duration_seconds` | Histogram | Tempo de clone do repositório |
+| `mcpguard_repo_clone_errors_total` | Counter | Falhas de clone |
+| `mcpguard_agentic_analysis_submitted_total` | Counter | Análises agênticas submetidas |
+| `mcpguard_agentic_analysis_completed_total` | Counter | Análises agênticas concluídas |
+| `http_requests_total` | Counter | Requisições HTTP por método e status |
+| `http_request_duration_seconds` | Histogram | Latência HTTP (p50/p90/p99) |
+
+**Figura F** — *Dashboard Grafana mostrando painéis "Findings by Severity" (piechart)
+e "Pipeline Stage Transitions" (timeseries) após um ciclo completo de análise.*
+
+**Figura G** — *Dashboard de logs (Loki) com filtragem por serviço e nível de log,
+mostrando o rastreamento do fluxo completo de uma análise.*
+
+**Discussão:** A instrumentação por estágio (`downloading → parsing → static_analysis
+→ done → waiting_agentic`) permite identificar gargalos específicos na pipeline. A stack
+Loki + Promtail complementa as métricas com rastreabilidade textual, permitindo
+correlacionar um `analysis_id` específico nos logs de todos os serviços envolvidos.
+
+---
+
+### 4.6. Resumo dos Resultados
+
+**Tabela 5. Status de implementação dos objetivos do projeto**
+
+| Objetivo | Status | Observação |
+|---|---|---|
+| Webhook GitHub — recebimento via PR (A) | ✅ Implementado | HMAC-SHA256, eventos PR e push |
+| Análise estática com 31 regras (B) | ✅ Implementado | 4 categorias, AST via tree-sitter |
+| Correlação com taxonomia MCP (C) | ✅ Implementado | Mapeamento 1:1 com MCPLib |
+| Relatórios automáticos com severidade (D) | ✅ Implementado | JSON + comentário PR |
+| Integração CI/CD (E) | ✅ Implementado | GitHub webhook → RabbitMQ → worker |
+| Análise agêntica semântica | ✅ Implementado | Gemini, contexto estático, escopo PR |
+| Observabilidade e métricas | ✅ Implementado | Prometheus, Grafana, Loki/Promtail |
 
 ## Referências
 

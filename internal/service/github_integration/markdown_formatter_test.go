@@ -54,8 +54,11 @@ func TestFormatFindingsMarkdown_WithFindings(t *testing.T) {
 	if !strings.Contains(md, "**HIGH:** 1") {
 		t.Error("expected high count")
 	}
-	if !strings.Contains(md, "| Severity | Rule | File | Line | Message |") {
+	if !strings.Contains(md, "| Severity | Rule | File | Message |") {
 		t.Error("expected findings table header")
+	}
+	if !strings.Contains(md, "`main.py:10`") {
+		t.Error("expected file:line format in table")
 	}
 	if !strings.Contains(md, "`R001`") {
 		t.Error("expected rule ID in table")
@@ -85,13 +88,10 @@ func TestFormatFindingsMarkdown_MoreThan20Findings(t *testing.T) {
 	if !strings.Contains(md, "**Total findings:** 25") {
 		t.Error("expected total findings count of 25")
 	}
-	if !strings.Contains(md, "and 5 more findings") {
-		t.Error("expected overflow message for >20 findings")
-	}
-	// Count table rows (each finding row starts with "| medium")
+	// All 25 findings should be shown (limit is 100 now)
 	rows := strings.Count(md, "| medium |")
-	if rows != 20 {
-		t.Errorf("expected 20 table rows, got %d", rows)
+	if rows != 25 {
+		t.Errorf("expected 25 table rows, got %d", rows)
 	}
 }
 

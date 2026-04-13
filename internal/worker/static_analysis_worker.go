@@ -21,6 +21,7 @@ import (
 	"github.com/FlppFer/MCPGuard/internal/repositories/obj_storage"
 	"github.com/FlppFer/MCPGuard/internal/service"
 	ghintegration "github.com/FlppFer/MCPGuard/internal/service/github_integration"
+	servicemodel "github.com/FlppFer/MCPGuard/internal/service/model"
 	"github.com/FlppFer/MCPGuard/internal/service/static_analysis"
 	"github.com/FlppFer/MCPGuard/internal/utils"
 )
@@ -136,10 +137,12 @@ func (w *StaticAnalysisWorker) handleMessage(ctx context.Context, msg amqp.Deliv
 	if err := w.processJob(ctx, &job); err != nil {
 		slog.Error("Worker: job failed, requeuing", "analysis_id", job.AnalysisID, "error", err)
 		msg.Nack(false, true) // requeue for retry
+		metrics.QueueConsumeTotal.WithLabelValues(messaging.QueueStaticAnalysis, "failure").Inc()
 		return
 	}
 
 	msg.Ack(false)
+	metrics.QueueConsumeTotal.WithLabelValues(messaging.QueueStaticAnalysis, "success").Inc()
 	slog.Info("Worker: job completed successfully", "analysis_id", job.AnalysisID)
 }
 
@@ -150,14 +153,17 @@ func (w *StaticAnalysisWorker) processJob(ctx context.Context, job *messaging.An
 	}
 
 	// 1. Download source archive from S3
+	stageStart := time.Now()
 	entity.Status = repositories2.StatusDownloadingRepo.String()
 	entity.UpdatedAt = time.Now()
 	w.dbRepo.Update(ctx, entity)
+	metrics.AnalysisStageTransitions.WithLabelValues("queued", "downloading").Inc()
 
 	sourceData, err := w.storageRepo.DownloadFile(ctx, job.SourceKey)
 	if err != nil {
 		return w.failJob(ctx, entity, fmt.Errorf("failed to download source archive: %w", err))
 	}
+	metrics.AnalysisStageDuration.WithLabelValues("downloading").Observe(time.Since(stageStart).Seconds())
 
 	// 2. Extract zip to temp directory
 	extractDir, err := w.extractZip(job.AnalysisID, sourceData)
@@ -167,19 +173,24 @@ func (w *StaticAnalysisWorker) processJob(ctx context.Context, job *messaging.An
 	defer os.RemoveAll(extractDir)
 
 	// 3. Parse repository files
+	stageStart = time.Now()
 	entity.Status = repositories2.StatusParsingFiles.String()
 	entity.UpdatedAt = time.Now()
 	w.dbRepo.Update(ctx, entity)
+	metrics.AnalysisStageTransitions.WithLabelValues("downloading", "parsing").Inc()
 
 	parsedFiles, err := utils.ParseRepositoryFiles(extractDir)
 	if err != nil {
 		return w.failJob(ctx, entity, fmt.Errorf("failed to parse files: %w", err))
 	}
+	metrics.AnalysisStageDuration.WithLabelValues("parsing").Observe(time.Since(stageStart).Seconds())
 
 	// 4. Run static analysis
+	stageStart = time.Now()
 	entity.Status = repositories2.StatusStaticAnalysisRunning.String()
 	entity.UpdatedAt = time.Now()
 	w.dbRepo.Update(ctx, entity)
+	metrics.AnalysisStageTransitions.WithLabelValues("parsing", "static_analysis").Inc()
 
 	analysisStart := time.Now()
 	result, err := w.analyzer.RunAnalysis(ctx, job.AnalysisID, parsedFiles)
@@ -189,6 +200,7 @@ func (w *StaticAnalysisWorker) processJob(ctx context.Context, job *messaging.An
 	}
 
 	metrics.AnalysisDuration.Observe(time.Since(analysisStart).Seconds())
+	metrics.AnalysisStageDuration.WithLabelValues("static_analysis").Observe(time.Since(stageStart).Seconds())
 	for _, f := range result.Findings {
 		metrics.FindingsTotal.WithLabelValues(f.Severity).Inc()
 	}
@@ -204,6 +216,7 @@ func (w *StaticAnalysisWorker) processJob(ctx context.Context, job *messaging.An
 	entity.UpdatedAt = time.Now()
 	w.dbRepo.Update(ctx, entity)
 	metrics.AnalysesTotal.WithLabelValues("worker", "success").Inc()
+	metrics.AnalysisStageTransitions.WithLabelValues("static_analysis", "done").Inc()
 
 	// 7. Post PR comment if this was triggered by a pull_request event
 	if job.PRNumber > 0 && w.prCommentService != nil {
@@ -214,7 +227,7 @@ func (w *StaticAnalysisWorker) processJob(ctx context.Context, job *messaging.An
 
 	// 8. Optionally trigger agentic analysis
 	if w.agenticOn {
-		w.submitAgentic(ctx, entity, job)
+		w.submitAgentic(ctx, entity, job, result)
 	}
 
 	return nil
@@ -301,17 +314,43 @@ func (w *StaticAnalysisWorker) uploadResult(ctx context.Context, analysisID stri
 	return w.storageRepo.UploadFile(ctx, s3Key, tmpFile)
 }
 
-func (w *StaticAnalysisWorker) submitAgentic(ctx context.Context, entity *repositories2.AnalysisEntity, job *messaging.AnalysisJobMessage) {
+func (w *StaticAnalysisWorker) submitAgentic(ctx context.Context, entity *repositories2.AnalysisEntity, job *messaging.AnalysisJobMessage, staticResult *servicemodel.AnalysisResult) {
 	entity.Status = repositories2.StatusWaitingAgentAnalysis.String()
 	entity.UpdatedAt = time.Now()
 	w.dbRepo.Update(ctx, entity)
+	metrics.AnalysisStageTransitions.WithLabelValues("done", "waiting_agentic").Inc()
+
+	var staticFindings []httpmodel.StaticFindingContext
+	if staticResult != nil {
+		for _, f := range staticResult.Findings {
+			staticFindings = append(staticFindings, httpmodel.StaticFindingContext{
+				RuleID:   f.RuleID,
+				FilePath: f.FilePath,
+				Line:     f.Line,
+				Severity: f.Severity,
+				Message:  f.Message,
+			})
+		}
+	}
+
+	var changedFiles []string
+	if job.PRNumber > 0 && w.prCommentService != nil {
+		if files, err := w.prCommentService.FetchChangedFiles(ctx, job.RepoFullName, job.PRNumber); err != nil {
+			slog.Warn("Worker: failed to fetch PR changed files, will analyze full repo",
+				"analysis_id", job.AnalysisID, "error", err)
+		} else {
+			changedFiles = files
+		}
+	}
 
 	req := &httpmodel.AgenticAnalysisRequestDTO{
-		AnalysisID: job.AnalysisID,
-		RepoURL:    job.RepoURL,
-		Branch:     job.Branch,
-		Commit:     job.Commit,
-		SourceKey:  job.SourceKey,
+		AnalysisID:     job.AnalysisID,
+		RepoURL:        job.RepoURL,
+		Branch:         job.Branch,
+		Commit:         job.Commit,
+		SourceKey:      job.SourceKey,
+		StaticFindings: staticFindings,
+		PRChangedFiles: changedFiles,
 	}
 
 	if err := w.agenticSvc.SubmitForAnalysis(ctx, req); err != nil {

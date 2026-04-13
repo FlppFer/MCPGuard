@@ -15,20 +15,29 @@
       "collapsed": false
     },
     {
-      "title": "Analyses per Hour",
+      "title": "Analyses (1m buckets)",
       "type": "timeseries",
       "gridPos": { "h": 6, "w": 8, "x": 0, "y": 1 },
       "datasource": { "type": "prometheus", "uid": "prometheus" },
       "targets": [
         {
-          "expr": "sum(rate(mcpguard_analyses_total[1h])) by (trigger_type, status)",
+          "expr": "sum(increase(mcpguard_analyses_total[1m])) by (trigger_type, status)",
           "legendFormat": "{{trigger_type}} — {{status}}"
         }
       ],
       "fieldConfig": {
         "defaults": {
-          "unit": "ops"
+          "unit": "short",
+          "custom": {
+            "drawStyle": "bars",
+            "fillOpacity": 80,
+            "lineWidth": 0,
+            "barAlignment": 0
+          }
         }
+      },
+      "options": {
+        "tooltip": { "mode": "multi" }
       }
     },
     {
@@ -52,7 +61,7 @@
     {
       "title": "Active Analyses by Stage",
       "type": "stat",
-      "gridPos": { "h": 6, "w": 8, "x": 16, "y": 1 },
+      "gridPos": { "h": 6, "w": 8, "x": 16, "y": 7 },
       "datasource": { "type": "prometheus", "uid": "prometheus" },
       "targets": [
         {
@@ -74,32 +83,75 @@
       }
     },
     {
-      "title": "📊 Application Performance",
-      "type": "row",
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 7 },
-      "collapsed": false
-    },
-    {
-      "title": "HTTP Request Rate by Path",
-      "type": "timeseries",
-      "gridPos": { "h": 6, "w": 12, "x": 0, "y": 8 },
+      "title": "Webhook Requests Received",
+      "type": "bargauge",
+      "gridPos": { "h": 6, "w": 16, "x": 0, "y": 7 },
       "datasource": { "type": "prometheus", "uid": "prometheus" },
       "targets": [
         {
-          "expr": "sum(rate(http_requests_total[5m])) by (path)",
+          "expr": "sum by (status) (http_requests_total{method=\"POST\", path=\"/v1/webhook/github\"})",
+          "legendFormat": "HTTP {{status}}",
+          "instant": true
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": { "mode": "palette-classic" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "value": 0, "color": "green" },
+              { "value": 1, "color": "blue" }
+            ]
+          }
+        }
+      },
+      "options": {
+        "orientation": "horizontal",
+        "displayMode": "gradient",
+        "reduceOptions": {
+          "calcs": ["lastNotNull"]
+        },
+        "legend": { "displayMode": "list", "placement": "bottom" }
+      }
+    },
+    {
+      "title": "📊 Application Performance",
+      "type": "row",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 14 },
+      "collapsed": false
+    },
+    {
+      "title": "HTTP Requests by Path (1m buckets)",
+      "type": "timeseries",
+      "gridPos": { "h": 6, "w": 12, "x": 0, "y": 15 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "expr": "sum(increase(http_requests_total[1m])) by (path)",
           "legendFormat": "{{path}}"
         }
       ],
       "fieldConfig": {
         "defaults": {
-          "unit": "reqps"
+          "unit": "short",
+          "custom": {
+            "drawStyle": "bars",
+            "fillOpacity": 80,
+            "lineWidth": 0,
+            "barAlignment": 0
+          }
         }
+      },
+      "options": {
+        "tooltip": { "mode": "multi" }
       }
     },
     {
       "title": "HTTP Latency (p50 / p90 / p99)",
       "type": "timeseries",
-      "gridPos": { "h": 6, "w": 12, "x": 12, "y": 8 },
+      "gridPos": { "h": 6, "w": 12, "x": 12, "y": 15 },
       "datasource": { "type": "prometheus", "uid": "prometheus" },
       "targets": [
         {
@@ -122,292 +174,611 @@
       }
     },
     {
-      "title": "HTTP Error Rate (5xx)",
-      "type": "timeseries",
-      "gridPos": { "h": 6, "w": 12, "x": 0, "y": 14 },
-      "datasource": { "type": "prometheus", "uid": "prometheus" },
-      "targets": [
-        {
-          "expr": "sum(rate(http_requests_total{status=~\"5..\"}[5m])) by (path)",
-          "legendFormat": "{{path}}"
-        }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "reqps",
-          "color": { "mode": "fixed", "fixedColor": "red" }
-        }
-      }
-    },
-    {
-      "title": "Analysis Duration (p50 / p90 / p99)",
-      "type": "timeseries",
-      "gridPos": { "h": 6, "w": 12, "x": 12, "y": 14 },
-      "datasource": { "type": "prometheus", "uid": "prometheus" },
-      "targets": [
-        {
-          "expr": "histogram_quantile(0.50, rate(mcpguard_analysis_duration_seconds_bucket[5m]))",
-          "legendFormat": "p50"
-        },
-        {
-          "expr": "histogram_quantile(0.90, rate(mcpguard_analysis_duration_seconds_bucket[5m]))",
-          "legendFormat": "p90"
-        },
-        {
-          "expr": "histogram_quantile(0.99, rate(mcpguard_analysis_duration_seconds_bucket[5m]))",
-          "legendFormat": "p99"
-        }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "s"
-        }
-      }
-    },
-    {
-      "title": "🔄 Analysis Pipeline Flow",
-      "type": "row",
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 20 },
-      "collapsed": false
-    },
-    {
-      "title": "Pipeline Stage Transitions",
+      "title": "HTTP 5xx Errors by Path (1m buckets)",
       "type": "timeseries",
       "gridPos": { "h": 6, "w": 12, "x": 0, "y": 21 },
       "datasource": { "type": "prometheus", "uid": "prometheus" },
       "targets": [
         {
-          "expr": "sum(rate(mcpguard_analysis_stage_transitions_total[5m])) by (to_stage)",
-          "legendFormat": "→ {{to_stage}}"
+          "expr": "sum(increase(http_requests_total{status=~\"5..\"}[1m])) by (path)",
+          "legendFormat": "{{path}}"
         }
       ],
       "fieldConfig": {
         "defaults": {
-          "unit": "ops"
+          "unit": "short",
+          "color": { "mode": "fixed", "fixedColor": "red" },
+          "custom": {
+            "drawStyle": "bars",
+            "fillOpacity": 80,
+            "lineWidth": 0
+          }
         }
       }
     },
     {
-      "title": "Stage Duration by Stage",
-      "type": "timeseries",
+      "title": "Analysis Duration (p50 / p90 / p99)",
+      "type": "bargauge",
       "gridPos": { "h": 6, "w": 12, "x": 12, "y": 21 },
       "datasource": { "type": "prometheus", "uid": "prometheus" },
       "targets": [
         {
-          "expr": "histogram_quantile(0.95, sum(rate(mcpguard_analysis_stage_duration_seconds_bucket[5m])) by (le, stage))",
-          "legendFormat": "{{stage}} p95"
+          "expr": "histogram_quantile(0.50, sum(increase(mcpguard_analysis_duration_seconds_bucket[$__range])) by (le))",
+          "legendFormat": "p50",
+          "instant": true
+        },
+        {
+          "expr": "histogram_quantile(0.90, sum(increase(mcpguard_analysis_duration_seconds_bucket[$__range])) by (le))",
+          "legendFormat": "p90",
+          "instant": true
+        },
+        {
+          "expr": "histogram_quantile(0.99, sum(increase(mcpguard_analysis_duration_seconds_bucket[$__range])) by (le))",
+          "legendFormat": "p99",
+          "instant": true
         }
       ],
       "fieldConfig": {
         "defaults": {
-          "unit": "s"
+          "unit": "s",
+          "color": { "mode": "palette-classic" }
         }
+      },
+      "options": {
+        "orientation": "horizontal",
+        "displayMode": "gradient",
+        "reduceOptions": { "calcs": ["lastNotNull"] }
+      }
+    },
+    {
+      "title": "🔄 Analysis Pipeline Flow",
+      "type": "row",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 27 },
+      "collapsed": false
+    },
+    {
+      "title": "Stage: received → parsing (1m)",
+      "type": "timeseries",
+      "gridPos": { "h": 6, "w": 6, "x": 0, "y": 28 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "expr": "increase(mcpguard_analysis_stage_transitions_total{from_stage=\"received\",to_stage=\"parsing\"}[1m])",
+          "legendFormat": "received → parsing"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": { "mode": "fixed", "fixedColor": "blue" },
+          "custom": { "drawStyle": "bars", "fillOpacity": 80, "lineWidth": 0 }
+        }
+      },
+      "options": { "tooltip": { "mode": "single" } }
+    },
+    {
+      "title": "Stage: parsing → static_analysis (1m)",
+      "type": "timeseries",
+      "gridPos": { "h": 6, "w": 6, "x": 6, "y": 28 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "expr": "increase(mcpguard_analysis_stage_transitions_total{from_stage=\"parsing\",to_stage=\"static_analysis\"}[1m])",
+          "legendFormat": "parsing → static_analysis"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": { "mode": "fixed", "fixedColor": "green" },
+          "custom": { "drawStyle": "bars", "fillOpacity": 80, "lineWidth": 0 }
+        }
+      },
+      "options": { "tooltip": { "mode": "single" } }
+    },
+    {
+      "title": "Stage: static_analysis → done (1m)",
+      "type": "timeseries",
+      "gridPos": { "h": 6, "w": 6, "x": 12, "y": 28 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "expr": "increase(mcpguard_analysis_stage_transitions_total{from_stage=\"static_analysis\",to_stage=\"done\"}[1m])",
+          "legendFormat": "static_analysis → done"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": { "mode": "fixed", "fixedColor": "orange" },
+          "custom": { "drawStyle": "bars", "fillOpacity": 80, "lineWidth": 0 }
+        }
+      },
+      "options": { "tooltip": { "mode": "single" } }
+    },
+    {
+      "title": "Stage: done → waiting_agentic (1m)",
+      "type": "timeseries",
+      "gridPos": { "h": 6, "w": 6, "x": 18, "y": 28 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "expr": "increase(mcpguard_analysis_stage_transitions_total{from_stage=\"done\",to_stage=\"waiting_agentic\"}[1m])",
+          "legendFormat": "done → waiting_agentic"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": { "mode": "fixed", "fixedColor": "purple" },
+          "custom": { "drawStyle": "bars", "fillOpacity": 80, "lineWidth": 0 }
+        }
+      },
+      "options": { "tooltip": { "mode": "single" } }
+    },
+    {
+      "title": "Stage Duration by Stage",
+      "type": "bargauge",
+      "gridPos": { "h": 6, "w": 12, "x": 0, "y": 34 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum(increase(mcpguard_analysis_stage_duration_seconds_bucket[$__range])) by (le, stage))",
+          "legendFormat": "{{stage}} p95",
+          "instant": true
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "color": { "mode": "palette-classic" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "value": 0, "color": "green" },
+              { "value": 1, "color": "yellow" },
+              { "value": 10, "color": "red" }
+            ]
+          }
+        }
+      },
+      "options": {
+        "orientation": "horizontal",
+        "displayMode": "gradient",
+        "reduceOptions": { "calcs": ["lastNotNull"] }
       }
     },
     {
       "title": "Repository Clone Metrics",
-      "type": "timeseries",
-      "gridPos": { "h": 6, "w": 8, "x": 0, "y": 27 },
+      "type": "bargauge",
+      "gridPos": { "h": 6, "w": 8, "x": 0, "y": 34 },
       "datasource": { "type": "prometheus", "uid": "prometheus" },
       "targets": [
         {
-          "expr": "histogram_quantile(0.95, rate(mcpguard_repo_clone_duration_seconds_bucket[5m]))",
-          "legendFormat": "Clone Duration p95"
+          "expr": "histogram_quantile(0.95, sum(increase(mcpguard_repo_clone_duration_seconds_bucket[$__range])) by (le))",
+          "legendFormat": "Clone Duration p95",
+          "instant": true
         },
         {
-          "expr": "rate(mcpguard_repo_clone_errors_total[5m])",
-          "legendFormat": "Clone Errors"
+          "expr": "increase(mcpguard_repo_clone_errors_total[$__range])",
+          "legendFormat": "Clone Errors",
+          "instant": true
         }
       ],
       "fieldConfig": {
         "defaults": {
-          "unit": "s"
+          "unit": "s",
+          "color": { "mode": "palette-classic" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "value": 0, "color": "green" },
+              { "value": 5, "color": "yellow" },
+              { "value": 30, "color": "red" }
+            ]
+          }
         }
+      },
+      "options": {
+        "orientation": "horizontal",
+        "displayMode": "gradient",
+        "reduceOptions": { "calcs": ["lastNotNull"] }
       }
     },
     {
       "title": "Storage Operations",
-      "type": "timeseries",
-      "gridPos": { "h": 6, "w": 8, "x": 8, "y": 27 },
+      "type": "bargauge",
+      "gridPos": { "h": 6, "w": 8, "x": 8, "y": 34 },
       "datasource": { "type": "prometheus", "uid": "prometheus" },
       "targets": [
         {
-          "expr": "histogram_quantile(0.95, sum(rate(mcpguard_storage_upload_duration_seconds_bucket[5m])) by (le, file_type))",
-          "legendFormat": "Upload {{file_type}}"
+          "expr": "histogram_quantile(0.95, sum(increase(mcpguard_storage_upload_duration_seconds_bucket[$__range])) by (le, file_type))",
+          "legendFormat": "Upload {{file_type}}",
+          "instant": true
         },
         {
-          "expr": "histogram_quantile(0.95, sum(rate(mcpguard_storage_download_duration_seconds_bucket[5m])) by (le, file_type))",
-          "legendFormat": "Download {{file_type}}"
+          "expr": "histogram_quantile(0.95, sum(increase(mcpguard_storage_download_duration_seconds_bucket[$__range])) by (le, file_type))",
+          "legendFormat": "Download {{file_type}}",
+          "instant": true
         }
       ],
       "fieldConfig": {
         "defaults": {
-          "unit": "s"
+          "unit": "s",
+          "color": { "mode": "palette-classic" }
         }
+      },
+      "options": {
+        "orientation": "horizontal",
+        "displayMode": "gradient",
+        "reduceOptions": { "calcs": ["lastNotNull"] }
       }
     },
     {
       "title": "Database Operations",
-      "type": "timeseries",
-      "gridPos": { "h": 6, "w": 8, "x": 16, "y": 27 },
+      "type": "bargauge",
+      "gridPos": { "h": 6, "w": 8, "x": 16, "y": 34 },
       "datasource": { "type": "prometheus", "uid": "prometheus" },
       "targets": [
         {
-          "expr": "histogram_quantile(0.95, sum(rate(mcpguard_database_operation_duration_seconds_bucket[5m])) by (le, operation))",
-          "legendFormat": "{{operation}}"
+          "expr": "histogram_quantile(0.95, sum(increase(mcpguard_database_operation_duration_seconds_bucket[$__range])) by (le, operation))",
+          "legendFormat": "{{operation}}",
+          "instant": true
         }
       ],
       "fieldConfig": {
         "defaults": {
-          "unit": "s"
+          "unit": "s",
+          "color": { "mode": "palette-classic" }
         }
+      },
+      "options": {
+        "orientation": "horizontal",
+        "displayMode": "gradient",
+        "reduceOptions": { "calcs": ["lastNotNull"] }
       }
     },
     {
       "title": "🤖 Agentic Analysis",
       "type": "row",
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 33 },
-      "collapsed": false
-    },
-    {
-      "title": "Agentic Analysis Flow",
-      "type": "timeseries",
-      "gridPos": { "h": 6, "w": 12, "x": 0, "y": 34 },
-      "datasource": { "type": "prometheus", "uid": "prometheus" },
-      "targets": [
-        {
-          "expr": "rate(mcpguard_agentic_analysis_submitted_total[5m])",
-          "legendFormat": "Submitted"
-        },
-        {
-          "expr": "sum(rate(mcpguard_agentic_analysis_completed_total[5m])) by (status)",
-          "legendFormat": "Completed ({{status}})"
-        }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "ops"
-        }
-      }
-    },
-    {
-      "title": "Agentic Analysis Duration",
-      "type": "timeseries",
-      "gridPos": { "h": 6, "w": 12, "x": 12, "y": 34 },
-      "datasource": { "type": "prometheus", "uid": "prometheus" },
-      "targets": [
-        {
-          "expr": "histogram_quantile(0.50, rate(mcpguard_agentic_analysis_duration_seconds_bucket[5m]))",
-          "legendFormat": "p50"
-        },
-        {
-          "expr": "histogram_quantile(0.90, rate(mcpguard_agentic_analysis_duration_seconds_bucket[5m]))",
-          "legendFormat": "p90"
-        },
-        {
-          "expr": "histogram_quantile(0.99, rate(mcpguard_agentic_analysis_duration_seconds_bucket[5m]))",
-          "legendFormat": "p99"
-        }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "s"
-        }
-      }
-    },
-    {
-      "title": "💻 Container Resources",
-      "type": "row",
       "gridPos": { "h": 1, "w": 24, "x": 0, "y": 40 },
       "collapsed": false
     },
     {
-      "title": "Container CPU Usage",
+      "title": "Agentic Analysis Flow (1m buckets)",
       "type": "timeseries",
       "gridPos": { "h": 6, "w": 12, "x": 0, "y": 41 },
       "datasource": { "type": "prometheus", "uid": "prometheus" },
       "targets": [
         {
-          "expr": "rate(container_cpu_usage_seconds_total{name=~\"mcpguard.*\"}[5m]) * 100",
-          "legendFormat": "{{name}}"
+          "expr": "increase(mcpguard_agentic_analysis_submitted_total[1m])",
+          "legendFormat": "Submitted"
+        },
+        {
+          "expr": "sum(increase(mcpguard_agentic_analysis_completed_total[1m])) by (status)",
+          "legendFormat": "Completed ({{status}})"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "drawStyle": "bars",
+            "fillOpacity": 80,
+            "lineWidth": 0,
+            "barAlignment": 0
+          }
+        }
+      },
+      "options": {
+        "tooltip": { "mode": "multi" }
+      }
+    },
+    {
+      "title": "Agentic Analysis Duration (p50/p90/p99)",
+      "type": "bargauge",
+      "gridPos": { "h": 6, "w": 12, "x": 12, "y": 41 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.50, sum(increase(mcpguard_agentic_analysis_duration_seconds_bucket[$__range])) by (le))",
+          "legendFormat": "p50",
+          "instant": true
+        },
+        {
+          "expr": "histogram_quantile(0.90, sum(increase(mcpguard_agentic_analysis_duration_seconds_bucket[$__range])) by (le))",
+          "legendFormat": "p90",
+          "instant": true
+        },
+        {
+          "expr": "histogram_quantile(0.99, sum(increase(mcpguard_agentic_analysis_duration_seconds_bucket[$__range])) by (le))",
+          "legendFormat": "p99",
+          "instant": true
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "color": { "mode": "palette-classic" }
+        }
+      },
+      "options": {
+        "orientation": "horizontal",
+        "displayMode": "gradient",
+        "reduceOptions": { "calcs": ["lastNotNull"] }
+      }
+    },
+    {
+      "title": "📨 Queue Observability",
+      "type": "row",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 47 },
+      "collapsed": false
+    },
+    {
+      "title": "Messages Published (1m buckets)",
+      "type": "timeseries",
+      "gridPos": { "h": 6, "w": 12, "x": 0, "y": 48 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "expr": "sum(increase(mcpguard_queue_publish_total[1m])) by (queue_name, status)",
+          "legendFormat": "{{queue_name}} — {{status}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "drawStyle": "bars",
+            "fillOpacity": 80,
+            "lineWidth": 0,
+            "barAlignment": 0
+          }
+        }
+      },
+      "options": { "tooltip": { "mode": "multi" } }
+    },
+    {
+      "title": "Messages Consumed (1m buckets)",
+      "type": "timeseries",
+      "gridPos": { "h": 6, "w": 12, "x": 12, "y": 48 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "expr": "sum(increase(mcpguard_queue_consume_total[1m])) by (queue_name, status)",
+          "legendFormat": "{{queue_name}} — {{status}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "drawStyle": "bars",
+            "fillOpacity": 80,
+            "lineWidth": 0,
+            "barAlignment": 0
+          }
+        }
+      },
+      "options": { "tooltip": { "mode": "multi" } }
+    },
+    {
+      "title": "Queue Publish Duration (p95)",
+      "type": "bargauge",
+      "gridPos": { "h": 6, "w": 12, "x": 0, "y": 54 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum(increase(mcpguard_queue_publish_duration_seconds_bucket[$__range])) by (le))",
+          "legendFormat": "p95",
+          "instant": true
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "color": { "mode": "palette-classic" }
+        }
+      },
+      "options": {
+        "orientation": "horizontal",
+        "displayMode": "gradient",
+        "reduceOptions": { "calcs": ["lastNotNull"] }
+      }
+    },
+    {
+      "title": "Publish vs Consume (total)",
+      "type": "stat",
+      "gridPos": { "h": 6, "w": 12, "x": 12, "y": 54 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "expr": "sum(mcpguard_queue_publish_total{status=\"success\"})",
+          "legendFormat": "Published",
+          "instant": true
+        },
+        {
+          "expr": "sum(mcpguard_queue_consume_total{status=\"success\"})",
+          "legendFormat": "Consumed",
+          "instant": true
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": { "mode": "palette-classic" }
+        }
+      },
+      "options": {
+        "orientation": "horizontal",
+        "textMode": "value_and_name",
+        "reduceOptions": { "calcs": ["lastNotNull"] }
+      }
+    },
+    {
+      "title": "💻 Container Resources",
+      "type": "row",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 47 },
+      "collapsed": false
+    },
+    {
+      "title": "CPU % of Total (by service)",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 48 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "expr": "sum by (container_label_com_docker_compose_service) (rate(container_cpu_usage_seconds_total{container_label_com_docker_compose_service!=''}[5m]))\n/ ignoring(container_label_com_docker_compose_service) group_left\nsum(rate(container_cpu_usage_seconds_total{container_label_com_docker_compose_service!=''}[5m]))\n* 100",
+          "legendFormat": "{{container_label_com_docker_compose_service}}"
         }
       ],
       "fieldConfig": {
         "defaults": {
           "unit": "percent",
-          "max": 100
+          "min": 0,
+          "max": 100,
+          "custom": { "fillOpacity": 10, "lineWidth": 2 }
         }
-      }
+      },
+      "options": { "tooltip": { "mode": "multi" } }
     },
     {
-      "title": "Container Memory Usage",
+      "title": "RAM % of Total (by service)",
       "type": "timeseries",
-      "gridPos": { "h": 6, "w": 12, "x": 12, "y": 41 },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 48 },
       "datasource": { "type": "prometheus", "uid": "prometheus" },
       "targets": [
         {
-          "expr": "container_memory_usage_bytes{name=~\"mcpguard.*\"} / 1024 / 1024",
-          "legendFormat": "{{name}}"
+          "expr": "sum by (container_label_com_docker_compose_service) (container_memory_usage_bytes{container_label_com_docker_compose_service!=''})\n/ ignoring(container_label_com_docker_compose_service) group_left\nsum(container_memory_usage_bytes{container_label_com_docker_compose_service!=''})\n* 100",
+          "legendFormat": "{{container_label_com_docker_compose_service}}"
         }
       ],
       "fieldConfig": {
         "defaults": {
-          "unit": "decmbytes"
+          "unit": "percent",
+          "min": 0,
+          "max": 100,
+          "custom": { "fillOpacity": 10, "lineWidth": 2 }
         }
-      }
+      },
+      "options": { "tooltip": { "mode": "multi" } }
     },
     {
-      "title": "Container Network I/O",
-      "type": "timeseries",
-      "gridPos": { "h": 6, "w": 12, "x": 0, "y": 47 },
+      "title": "CPU % of Total — Current (by service)",
+      "type": "bargauge",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 56 },
       "datasource": { "type": "prometheus", "uid": "prometheus" },
       "targets": [
         {
-          "expr": "rate(container_network_receive_bytes_total{name=~\"mcpguard.*\"}[5m]) / 1024",
-          "legendFormat": "{{name}} RX"
-        },
-        {
-          "expr": "rate(container_network_transmit_bytes_total{name=~\"mcpguard.*\"}[5m]) / 1024",
-          "legendFormat": "{{name}} TX"
+          "expr": "sum by (container_label_com_docker_compose_service) (rate(container_cpu_usage_seconds_total{container_label_com_docker_compose_service!=''}[2m]))\n/ ignoring(container_label_com_docker_compose_service) group_left\nsum(rate(container_cpu_usage_seconds_total{container_label_com_docker_compose_service!=''}[2m]))\n* 100",
+          "legendFormat": "{{container_label_com_docker_compose_service}}",
+          "instant": true
         }
       ],
       "fieldConfig": {
         "defaults": {
-          "unit": "KBs"
+          "unit": "percent",
+          "min": 0,
+          "max": 100,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "value": 0, "color": "green" },
+              { "value": 30, "color": "yellow" },
+              { "value": 60, "color": "red" }
+            ]
+          }
         }
+      },
+      "options": {
+        "orientation": "horizontal",
+        "displayMode": "gradient",
+        "reduceOptions": { "calcs": ["lastNotNull"] }
       }
     },
     {
-      "title": "Container Disk I/O",
-      "type": "timeseries",
-      "gridPos": { "h": 6, "w": 12, "x": 12, "y": 47 },
+      "title": "RAM % of Total — Current (by service)",
+      "type": "bargauge",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 56 },
       "datasource": { "type": "prometheus", "uid": "prometheus" },
       "targets": [
         {
-          "expr": "rate(container_fs_reads_bytes_total{name=~\"mcpguard.*\"}[5m]) / 1024 / 1024",
-          "legendFormat": "{{name}} Read"
-        },
-        {
-          "expr": "rate(container_fs_writes_bytes_total{name=~\"mcpguard.*\"}[5m]) / 1024 / 1024",
-          "legendFormat": "{{name}} Write"
+          "expr": "sum by (container_label_com_docker_compose_service) (container_memory_usage_bytes{container_label_com_docker_compose_service!=''})\n/ ignoring(container_label_com_docker_compose_service) group_left\nsum(container_memory_usage_bytes{container_label_com_docker_compose_service!=''})\n* 100",
+          "legendFormat": "{{container_label_com_docker_compose_service}}",
+          "instant": true
         }
       ],
       "fieldConfig": {
         "defaults": {
-          "unit": "MBs"
+          "unit": "percent",
+          "min": 0,
+          "max": 100,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "value": 0, "color": "green" },
+              { "value": 30, "color": "yellow" },
+              { "value": 60, "color": "red" }
+            ]
+          }
+        }
+      },
+      "options": {
+        "orientation": "horizontal",
+        "displayMode": "gradient",
+        "reduceOptions": { "calcs": ["lastNotNull"] }
+      }
+    },
+    {
+      "title": "Disk I/O % of Total — Read (by service)",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 64 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "expr": "sum by (container_label_com_docker_compose_service) (rate(container_fs_reads_bytes_total{container_label_com_docker_compose_service!=''}[5m]))\n/ ignoring(container_label_com_docker_compose_service) group_left\nsum(rate(container_fs_reads_bytes_total{container_label_com_docker_compose_service!=''}[5m]))\n* 100",
+          "legendFormat": "{{container_label_com_docker_compose_service}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "min": 0,
+          "max": 100,
+          "custom": { "fillOpacity": 10, "lineWidth": 2 }
+        }
+      }
+    },
+    {
+      "title": "Disk I/O % of Total — Write (by service)",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 64 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "expr": "sum by (container_label_com_docker_compose_service) (rate(container_fs_writes_bytes_total{container_label_com_docker_compose_service!=''}[5m]))\n/ ignoring(container_label_com_docker_compose_service) group_left\nsum(rate(container_fs_writes_bytes_total{container_label_com_docker_compose_service!=''}[5m]))\n* 100",
+          "legendFormat": "{{container_label_com_docker_compose_service}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "min": 0,
+          "max": 100,
+          "custom": { "fillOpacity": 10, "lineWidth": 2 }
         }
       }
     },
     {
       "title": "🖥️ Host System",
       "type": "row",
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 53 },
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 73 },
       "collapsed": false
     },
     {
       "title": "Host CPU Usage",
       "type": "timeseries",
-      "gridPos": { "h": 6, "w": 8, "x": 0, "y": 54 },
+      "gridPos": { "h": 6, "w": 8, "x": 0, "y": 74 },
       "datasource": { "type": "prometheus", "uid": "prometheus" },
       "targets": [
         {
@@ -434,7 +805,7 @@
     {
       "title": "Host Memory Usage",
       "type": "timeseries",
-      "gridPos": { "h": 6, "w": 8, "x": 8, "y": 54 },
+      "gridPos": { "h": 6, "w": 8, "x": 8, "y": 74 },
       "datasource": { "type": "prometheus", "uid": "prometheus" },
       "targets": [
         {
@@ -461,7 +832,7 @@
     {
       "title": "Host Disk Usage",
       "type": "gauge",
-      "gridPos": { "h": 6, "w": 8, "x": 16, "y": 54 },
+      "gridPos": { "h": 6, "w": 8, "x": 16, "y": 74 },
       "datasource": { "type": "prometheus", "uid": "prometheus" },
       "targets": [
         {

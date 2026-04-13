@@ -1,5 +1,3 @@
-version: "3.9"
-
 services:
   mcpguard-api:
     build:
@@ -8,11 +6,12 @@ services:
     ports:
       - "8080:8080"
     environment:
-      - SCOPE=local
-      - GITHUB_WEBHOOK_SECRET=${GITHUB_WEBHOOK_SECRET:-default-webhook-secret}
-      - MCPGUARD_API_KEYS=${MCPGUARD_API_KEYS:-dev-client:dev-key}
+      - SCOPE=docker
+      - GITHUB_WEBHOOK_SECRET=${GITHUB_WEBHOOK_SECRET:-}
+      - MCPGUARD_API_KEYS=${MCPGUARD_API_KEYS:-}
       - LOCALSTACK_ENDPOINT=http://localstack:4566
       - GIT_AUTH_TOKEN=${GIT_AUTH_TOKEN:-}
+      - GITHUB_TOKEN=${GITHUB_TOKEN:-}
     volumes:
       - mcpguard-storage:/app/mcpguard-local-storage
     depends_on:
@@ -91,12 +90,34 @@ services:
     profiles:
       - observability
 
+  loki:
+    image: grafana/loki:3.0.0
+    ports:
+      - "3100:3100"
+    command: -config.file=/etc/loki/local-config.yaml
+    profiles:
+      - observability
+
+  promtail:
+    image: grafana/promtail:3.0.0
+    volumes:
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ./deploy/promtail/promtail.yaml:/etc/promtail/config.yaml
+    command: -config.file=/etc/promtail/config.yaml
+    depends_on:
+      - loki
+    profiles:
+      - observability
+
   grafana:
-    image: grafana/grafana:latest
+    image: grafana/grafana:11.1.0
     volumes:
       - ./deploy/grafana/provisioning/datasources.yaml:/etc/grafana/provisioning/datasources/datasources.yaml
       - ./deploy/grafana/provisioning/dashboards.yaml:/etc/grafana/provisioning/dashboards/dashboards.yaml
       - ./deploy/grafana/dashboards:/var/lib/grafana/dashboards
+      - ./deploy/grafana/custom.ini:/etc/grafana/grafana.ini
+      - ./deploy/grafana/custom.css:/etc/grafana/custom.css
     ports:
       - "3000:3000"
     environment:
@@ -105,6 +126,7 @@ services:
       - GF_AUTH_ANONYMOUS_ORG_ROLE=Viewer
     depends_on:
       - prometheus
+      - loki
     profiles:
       - observability
 

@@ -24,13 +24,24 @@ const (
 	ConfidenceFull Confidence = 1.0
 )
 
+// StaticFindingContext is a condensed static finding passed as context to the agentic worker.
+type StaticFindingContext struct {
+	RuleID   string `json:"rule_id"`
+	FilePath string `json:"file_path"`
+	Line     int    `json:"line"`
+	Severity string `json:"severity"`
+	Message  string `json:"message"`
+}
+
 // AgenticAnalysisRequestDTO is sent to the Python agentic worker to start analysis.
 type AgenticAnalysisRequestDTO struct {
-	AnalysisID string `json:"analysis_id"`
-	RepoURL    string `json:"repo_url"`
-	Branch     string `json:"branch"`
-	Commit     string `json:"commit"`
-	SourceKey  string `json:"source_key"` // S3 key for the zipped source archive
+	AnalysisID     string                 `json:"analysis_id"`
+	RepoURL        string                 `json:"repo_url"`
+	Branch         string                 `json:"branch"`
+	Commit         string                 `json:"commit"`
+	SourceKey      string                 `json:"source_key"`       // S3 key for the zipped source archive
+	StaticFindings []StaticFindingContext `json:"static_findings"`  // Optional: findings from static analysis
+	PRChangedFiles []string               `json:"pr_changed_files"` // Optional: restrict analysis to these files
 }
 
 // AgenticAnalysisResultDTO is received from the Python worker after analysis completes.

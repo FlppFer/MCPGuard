@@ -1,0 +1,22 @@
+/* Remove log level background colors in Grafana logs panels */
+[class*="logs-row"] [class*="level-warning"],
+[class*="logs-row"] [class*="level-error"],
+[class*="logs-row"] [class*="level-critical"],
+[class*="logs-row"] [class*="level-info"],
+[class*="logs-row"] [class*="level-debug"] {
+  background-color: transparent !important;
+}
+
+/* Remove the colored left-border stripe on log rows */
+[class*="logsRowLevelColor"]::after {
+  background-color: transparent !important;
+}
+
+/* Remove background on the entire log row for all levels */
+[class*="logs-row--level-warning"],
+[class*="logs-row--level-error"],
+[class*="logs-row--level-critical"],
+[class*="logs-row--level-info"],
+[class*="logs-row--level-debug"] {
+  background-color: transparent !important;
+}

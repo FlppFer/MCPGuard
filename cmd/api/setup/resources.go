@@ -43,6 +43,7 @@ func Bootstrap(ctx context.Context, cfg *config.Config) *Resources {
 	publisher := initPublisher(cfg)
 	queueEnabled := cfg.MessagingCfg != nil && cfg.MessagingCfg.Enabled
 	prCommentService := initPRCommentService(cfg)
+	agenticService = service.WithPRCommentService(agenticService, prCommentService)
 	gitWebhookService := service.NewGitWebhookService(dbClient, osClient, staticAnalyzer, agenticService, agenticEnabled, publisher, queueEnabled, prCommentService)
 
 	return &Resources{

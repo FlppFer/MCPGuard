@@ -6,7 +6,9 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"time"
 
+	"github.com/FlppFer/MCPGuard/internal/metrics"
 	"github.com/FlppFer/MCPGuard/internal/model/services"
 	"github.com/google/uuid"
 )
@@ -42,27 +44,23 @@ func DownloadRepo(repoURL, branch, commit string) (*services.RepoDownloadResultD
 	// Inject auth token for private repos if GIT_AUTH_TOKEN is set
 	cloneURL := injectGitToken(repoURL)
 
-	// Clone whole repo (shallow)
-	cloneCmd := exec.Command("git", "clone", "--depth", "1", cloneURL, repoDir)
+	// Clone the specific branch (shallow). This ensures the commit from a PR branch is present.
+	cloneArgs := []string{"clone", "--depth", "1"}
+	if branch != "" {
+		cloneArgs = append(cloneArgs, "--branch", branch)
+	}
+	cloneArgs = append(cloneArgs, cloneURL, repoDir)
+
+	cloneCmd := exec.Command("git", cloneArgs...)
 	cloneCmd.Stdout = os.Stdout
 	cloneCmd.Stderr = os.Stderr
 
+	cloneStart := time.Now()
 	if err := cloneCmd.Run(); err != nil {
+		metrics.RepoCloneErrors.Inc()
 		return nil, fmt.Errorf("git clone failed: %w", err)
 	}
-
-	// Optionally checkout a commit or branch
-	if commit != "" {
-		checkoutCmd := exec.Command("git", "checkout", commit)
-		checkoutCmd.Dir = repoDir
-		if err := checkoutCmd.Run(); err != nil {
-			return nil, fmt.Errorf("git checkout failed: %w", err)
-		}
-	} else if branch != "" {
-		checkoutCmd := exec.Command("git", "checkout", branch)
-		checkoutCmd.Dir = repoDir
-		_ = checkoutCmd.Run() // optional, maybe no branch
-	}
+	metrics.RepoCloneDuration.Observe(time.Since(cloneStart).Seconds())
 
 	// Zip the resulting folder
 	if err := zipFolder(repoDir, zipPath); err != nil {

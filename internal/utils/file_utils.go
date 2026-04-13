@@ -29,8 +29,13 @@ func ParseRepositoryFiles(path string) ([]services.SourceFileDTO, error) {
 			return err
 		}
 
+		relPath, err := filepath.Rel(path, p)
+		if err != nil {
+			relPath = p
+		}
+
 		files = append(files, services.SourceFileDTO{
-			Path:     p,
+			Path:     relPath,
 			Language: NormalizeExtension(ext),
 			Content:  string(content),
 		})

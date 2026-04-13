@@ -11,10 +11,12 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/FlppFer/MCPGuard/internal/metrics"
 	httpmodel "github.com/FlppFer/MCPGuard/internal/model/http"
 	repositories2 "github.com/FlppFer/MCPGuard/internal/model/repositories"
 	"github.com/FlppFer/MCPGuard/internal/repositories/db"
 	"github.com/FlppFer/MCPGuard/internal/repositories/obj_storage"
+	ghintegration "github.com/FlppFer/MCPGuard/internal/service/github_integration"
 )
 
 // AgenticAnalysisService defines the interface for AI-based semantic analysis operations.
@@ -30,11 +32,12 @@ type AgenticAnalysisService interface {
 }
 
 type agenticAnalysisServiceImpl struct {
-	dbRepo      db.DatabaseClient
-	storageRepo obj_storage.StorageRepository
-	workerURL   string
-	httpClient  *http.Client
-	enabled     bool
+	dbRepo           db.DatabaseClient
+	storageRepo      obj_storage.StorageRepository
+	workerURL        string
+	httpClient       *http.Client
+	enabled          bool
+	prCommentService ghintegration.PRCommentService
 }
 
 // NewAgenticAnalysisService creates a new agentic analysis service.
@@ -51,6 +54,14 @@ func NewAgenticAnalysisService(
 		httpClient:  &http.Client{Timeout: 30 * time.Second},
 		enabled:     enabled,
 	}
+}
+
+// WithPRCommentService sets the PR comment service on an existing agentic service instance.
+func WithPRCommentService(svc AgenticAnalysisService, prCommentService ghintegration.PRCommentService) AgenticAnalysisService {
+	if impl, ok := svc.(*agenticAnalysisServiceImpl); ok {
+		impl.prCommentService = prCommentService
+	}
+	return svc
 }
 
 // SubmitForAnalysis sends an analysis job to the Python agentic worker via HTTP POST.
@@ -82,6 +93,7 @@ func (s *agenticAnalysisServiceImpl) SubmitForAnalysis(ctx context.Context, req 
 		return fmt.Errorf("agentic worker returned status %d", resp.StatusCode)
 	}
 
+	metrics.AgenticAnalysisSubmitted.Inc()
 	slog.Info("Agentic analysis submitted", "analysis_id", req.AnalysisID, "worker_url", url)
 	return nil
 }
@@ -112,13 +124,24 @@ func (s *agenticAnalysisServiceImpl) ReceiveResult(ctx context.Context, result *
 		return fmt.Errorf("%w: %s", ErrAnalysisNotFound, err.Error())
 	}
 
+	agenticDuration := time.Since(entity.UpdatedAt)
 	entity.Status = repositories2.StatusCompleted.String()
 	entity.UpdatedAt = time.Now()
 	if err := s.dbRepo.Update(ctx, entity); err != nil {
 		return fmt.Errorf("failed to update analysis status: %w", err)
 	}
 
+	metrics.AgenticAnalysisDuration.Observe(agenticDuration.Seconds())
+	metrics.AgenticAnalysisCompleted.WithLabelValues("success").Inc()
 	slog.Info("Analysis status updated to completed", "analysis_id", result.AnalysisID)
+
+	// Post agentic PR comment if this was triggered by a pull_request event
+	if entity.PRNumber > 0 && s.prCommentService != nil {
+		if err := s.prCommentService.PostAgenticFindings(ctx, entity.RepoFullName, entity.PRNumber, result); err != nil {
+			slog.Warn("Failed to post agentic PR comment", "analysis_id", result.AnalysisID, "error", err)
+		}
+	}
+
 	return nil
 }
 

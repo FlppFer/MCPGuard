@@ -325,6 +325,7 @@ func (uc *gitWebhookServiceImpl) submitAgenticAnalysis(
 	ctx context.Context,
 	entity *repositories2.AnalysisEntity,
 	analysisID, repoURL, branch, commit string,
+	staticResult *model.AnalysisResult,
 ) {
 	if !uc.agenticEnabled {
 		return
@@ -333,13 +334,39 @@ func (uc *gitWebhookServiceImpl) submitAgenticAnalysis(
 	entity.Status = repositories2.StatusWaitingAgentAnalysis.String()
 	entity.UpdatedAt = time.Now()
 	uc.dbRepo.Update(ctx, entity)
+	metrics.AnalysisStageTransitions.WithLabelValues("done", "waiting_agentic").Inc()
+
+	var staticFindings []httpmodel.StaticFindingContext
+	if staticResult != nil {
+		for _, f := range staticResult.Findings {
+			staticFindings = append(staticFindings, httpmodel.StaticFindingContext{
+				RuleID:   f.RuleID,
+				FilePath: f.FilePath,
+				Line:     f.Line,
+				Severity: f.Severity,
+				Message:  f.Message,
+			})
+		}
+	}
+
+	var changedFiles []string
+	if entity.PRNumber > 0 && uc.prCommentService != nil {
+		if files, err := uc.prCommentService.FetchChangedFiles(ctx, entity.RepoFullName, entity.PRNumber); err != nil {
+			slog.Warn("Failed to fetch PR changed files, will analyze full repo",
+				"analysis_id", analysisID, "error", err)
+		} else {
+			changedFiles = files
+		}
+	}
 
 	agenticReq := &httpmodel.AgenticAnalysisRequestDTO{
-		AnalysisID: analysisID,
-		RepoURL:    repoURL,
-		Branch:     branch,
-		Commit:     commit,
-		SourceKey:  fmt.Sprintf(S3KeySourceArchive, analysisID),
+		AnalysisID:     analysisID,
+		RepoURL:        repoURL,
+		Branch:         branch,
+		Commit:         commit,
+		SourceKey:      fmt.Sprintf(S3KeySourceArchive, analysisID),
+		StaticFindings: staticFindings,
+		PRChangedFiles: changedFiles,
 	}
 
 	if err := uc.agenticService.SubmitForAnalysis(ctx, agenticReq); err != nil {
@@ -372,14 +399,18 @@ func (uc *gitWebhookServiceImpl) publishAnalysisJob(
 		return fmt.Errorf("failed to marshal analysis job: %w", err)
 	}
 
+	publishStart := time.Now()
 	if err := uc.publisher.Publish(ctx, messaging.QueueStaticAnalysis, msgBytes); err != nil {
 		slog.Error("Failed to publish analysis job", "analysis_id", analysisID, "error", err)
 		entity.Status = repositories2.StatusFailed.String()
 		entity.ErrorMessage = fmt.Sprintf("queue publish failed: %v", err)
 		uc.dbRepo.Update(ctx, entity)
 		metrics.AnalysesTotal.WithLabelValues("queue", "failure").Inc()
+		metrics.QueuePublishTotal.WithLabelValues(messaging.QueueStaticAnalysis, "failure").Inc()
 		return err
 	}
+	metrics.QueuePublishDuration.Observe(time.Since(publishStart).Seconds())
+	metrics.QueuePublishTotal.WithLabelValues(messaging.QueueStaticAnalysis, "success").Inc()
 
 	entity.Status = repositories2.StatusQueued.String()
 	entity.UpdatedAt = time.Now()
@@ -396,6 +427,9 @@ func (uc *gitWebhookServiceImpl) runLocalAnalysis(
 	analysisID, repoURL, branch, commit, localPath string,
 ) {
 	// Parse repository files
+	stageStart := time.Now()
+	metrics.AnalysisStageTransitions.WithLabelValues("received", "parsing").Inc()
+
 	parsedFiles, err := utils.ParseRepositoryFiles(localPath)
 	if err != nil {
 		entity.Status = repositories2.StatusFailed.String()
@@ -403,10 +437,13 @@ func (uc *gitWebhookServiceImpl) runLocalAnalysis(
 		uc.dbRepo.Update(context.Background(), entity)
 		return
 	}
+	metrics.AnalysisStageDuration.WithLabelValues("parsing").Observe(time.Since(stageStart).Seconds())
 
+	stageStart = time.Now()
 	entity.Status = repositories2.StatusStaticAnalysisRunning.String()
 	entity.UpdatedAt = time.Now()
 	uc.dbRepo.Update(context.Background(), entity)
+	metrics.AnalysisStageTransitions.WithLabelValues("parsing", "static_analysis").Inc()
 
 	go func() {
 		defer func() {
@@ -429,6 +466,7 @@ func (uc *gitWebhookServiceImpl) runLocalAnalysis(
 		}
 
 		metrics.AnalysisDuration.Observe(time.Since(analysisStart).Seconds())
+		metrics.AnalysisStageDuration.WithLabelValues("static_analysis").Observe(time.Since(stageStart).Seconds())
 		for _, f := range result.Findings {
 			metrics.FindingsTotal.WithLabelValues(f.Severity).Inc()
 		}
@@ -446,6 +484,7 @@ func (uc *gitWebhookServiceImpl) runLocalAnalysis(
 		entity.UpdatedAt = time.Now()
 		uc.dbRepo.Update(context.Background(), entity)
 		metrics.AnalysesTotal.WithLabelValues("local", "success").Inc()
+		metrics.AnalysisStageTransitions.WithLabelValues("static_analysis", "done").Inc()
 
 		// Post PR comment if this was a PR-triggered analysis
 		if entity.PRNumber > 0 && uc.prCommentService != nil {
@@ -454,6 +493,6 @@ func (uc *gitWebhookServiceImpl) runLocalAnalysis(
 			}
 		}
 
-		uc.submitAgenticAnalysis(asyncCtx, entity, analysisID, repoURL, branch, commit)
+		uc.submitAgenticAnalysis(asyncCtx, entity, analysisID, repoURL, branch, commit, result)
 	}()
 }

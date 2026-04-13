@@ -83,6 +83,11 @@ var (
 		Buckets: []float64{0.001, 0.005, 0.01, 0.05, 0.1, 0.5, 1},
 	})
 
+	QueueConsumeTotal = promauto.NewCounterVec(prometheus.CounterOpts{
+		Name: "mcpguard_queue_consume_total",
+		Help: "Total number of messages consumed from queue",
+	}, []string{"queue_name", "status"})
+
 	// Agentic analysis metrics
 	AgenticAnalysisSubmitted = promauto.NewCounter(prometheus.CounterOpts{
 		Name: "mcpguard_agentic_analysis_submitted_total",
