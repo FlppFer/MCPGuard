@@ -36,3 +36,6 @@ data/
 *.db
 mcpguard.db
 analysis_results/
+
+# Log files (debug artifacts)
+*.log

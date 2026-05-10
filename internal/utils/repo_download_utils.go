@@ -14,10 +14,10 @@ import (
 )
 
 // injectGitToken rewrites an HTTPS GitHub URL to include a token from
-// the GIT_AUTH_TOKEN env var, enabling cloning of private repositories.
+// the GITHUB_TOKEN env var, enabling cloning of private repositories.
 // If the env var is empty or the URL is not HTTPS, the URL is returned unchanged.
 func injectGitToken(repoURL string) string {
-	token := os.Getenv("GIT_AUTH_TOKEN")
+	token := os.Getenv("GITHUB_TOKEN")
 	if token == "" {
 		return repoURL
 	}
@@ -61,6 +61,11 @@ func DownloadRepo(repoURL, branch, commit string) (*services.RepoDownloadResultD
 		return nil, fmt.Errorf("git clone failed: %w", err)
 	}
 	metrics.RepoCloneDuration.Observe(time.Since(cloneStart).Seconds())
+
+	// Measure cloned repository size (best-effort — errors are non-fatal)
+	if size, err := dirSize(repoDir); err == nil {
+		metrics.RepoSizeBytes.Observe(float64(size))
+	}
 
 	// Zip the resulting folder
 	if err := zipFolder(repoDir, zipPath); err != nil {

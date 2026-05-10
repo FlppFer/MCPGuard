@@ -109,22 +109,4 @@ var (
 		Name: "mcpguard_agentic_worker_errors_total",
 		Help: "Total number of agentic worker errors",
 	}, []string{"error_type"})
-
-	// Database operations
-	DatabaseOperationDuration = promauto.NewHistogramVec(prometheus.HistogramOpts{
-		Name:    "mcpguard_database_operation_duration_seconds",
-		Help:    "Time taken for database operations",
-		Buckets: []float64{0.001, 0.005, 0.01, 0.05, 0.1, 0.5, 1},
-	}, []string{"operation"})
-
-	DatabaseOperationErrors = promauto.NewCounterVec(prometheus.CounterOpts{
-		Name: "mcpguard_database_operation_errors_total",
-		Help: "Total number of database operation failures",
-	}, []string{"operation"})
-
-	// Active analyses gauge
-	ActiveAnalyses = promauto.NewGaugeVec(prometheus.GaugeOpts{
-		Name: "mcpguard_active_analyses",
-		Help: "Number of currently active analyses",
-	}, []string{"stage"})
 )

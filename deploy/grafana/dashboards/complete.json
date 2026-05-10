@@ -59,33 +59,9 @@
       }
     },
     {
-      "title": "Active Analyses by Stage",
-      "type": "stat",
-      "gridPos": { "h": 6, "w": 8, "x": 16, "y": 7 },
-      "datasource": { "type": "prometheus", "uid": "prometheus" },
-      "targets": [
-        {
-          "expr": "sum(mcpguard_active_analyses) by (stage)",
-          "legendFormat": "{{stage}}"
-        }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "short",
-          "color": {
-            "mode": "palette-classic"
-          }
-        }
-      },
-      "options": {
-        "orientation": "horizontal",
-        "textMode": "value_and_name"
-      }
-    },
-    {
       "title": "Webhook Requests Received",
       "type": "bargauge",
-      "gridPos": { "h": 6, "w": 16, "x": 0, "y": 7 },
+      "gridPos": { "h": 6, "w": 24, "x": 0, "y": 7 },
       "datasource": { "type": "prometheus", "uid": "prometheus" },
       "targets": [
         {
@@ -237,89 +213,117 @@
       "collapsed": false
     },
     {
-      "title": "Stage: received → parsing (1m)",
+      "title": "① received → parsing",
       "type": "timeseries",
-      "gridPos": { "h": 6, "w": 6, "x": 0, "y": 28 },
+      "gridPos": { "h": 5, "w": 6, "x": 0, "y": 28 },
       "datasource": { "type": "prometheus", "uid": "prometheus" },
       "targets": [
         {
           "expr": "increase(mcpguard_analysis_stage_transitions_total{from_stage=\"received\",to_stage=\"parsing\"}[1m])",
-          "legendFormat": "received → parsing"
+          "legendFormat": "received → parsing",
+          "interval": "1m"
         }
       ],
       "fieldConfig": {
         "defaults": {
           "unit": "short",
           "color": { "mode": "fixed", "fixedColor": "blue" },
-          "custom": { "drawStyle": "bars", "fillOpacity": 80, "lineWidth": 0 }
+          "custom": {
+            "drawStyle": "bars",
+            "fillOpacity": 80,
+            "lineWidth": 0,
+            "barAlignment": 0,
+            "spanNulls": false
+          }
         }
       },
-      "options": { "tooltip": { "mode": "single" } }
+      "options": { "tooltip": { "mode": "single" }, "legend": { "displayMode": "hidden" } }
     },
     {
-      "title": "Stage: parsing → static_analysis (1m)",
+      "title": "② parsing → static_analysis",
       "type": "timeseries",
-      "gridPos": { "h": 6, "w": 6, "x": 6, "y": 28 },
+      "gridPos": { "h": 5, "w": 6, "x": 6, "y": 28 },
       "datasource": { "type": "prometheus", "uid": "prometheus" },
       "targets": [
         {
           "expr": "increase(mcpguard_analysis_stage_transitions_total{from_stage=\"parsing\",to_stage=\"static_analysis\"}[1m])",
-          "legendFormat": "parsing → static_analysis"
+          "legendFormat": "parsing → static_analysis",
+          "interval": "1m"
         }
       ],
       "fieldConfig": {
         "defaults": {
           "unit": "short",
           "color": { "mode": "fixed", "fixedColor": "green" },
-          "custom": { "drawStyle": "bars", "fillOpacity": 80, "lineWidth": 0 }
+          "custom": {
+            "drawStyle": "bars",
+            "fillOpacity": 80,
+            "lineWidth": 0,
+            "barAlignment": 0,
+            "spanNulls": false
+          }
         }
       },
-      "options": { "tooltip": { "mode": "single" } }
+      "options": { "tooltip": { "mode": "single" }, "legend": { "displayMode": "hidden" } }
     },
     {
-      "title": "Stage: static_analysis → done (1m)",
+      "title": "③ static_analysis → done",
       "type": "timeseries",
-      "gridPos": { "h": 6, "w": 6, "x": 12, "y": 28 },
+      "gridPos": { "h": 5, "w": 6, "x": 12, "y": 28 },
       "datasource": { "type": "prometheus", "uid": "prometheus" },
       "targets": [
         {
           "expr": "increase(mcpguard_analysis_stage_transitions_total{from_stage=\"static_analysis\",to_stage=\"done\"}[1m])",
-          "legendFormat": "static_analysis → done"
+          "legendFormat": "static_analysis → done",
+          "interval": "1m"
         }
       ],
       "fieldConfig": {
         "defaults": {
           "unit": "short",
           "color": { "mode": "fixed", "fixedColor": "orange" },
-          "custom": { "drawStyle": "bars", "fillOpacity": 80, "lineWidth": 0 }
+          "custom": {
+            "drawStyle": "bars",
+            "fillOpacity": 80,
+            "lineWidth": 0,
+            "barAlignment": 0,
+            "spanNulls": false
+          }
         }
       },
-      "options": { "tooltip": { "mode": "single" } }
+      "options": { "tooltip": { "mode": "single" }, "legend": { "displayMode": "hidden" } }
     },
     {
-      "title": "Stage: done → waiting_agentic (1m)",
+      "title": "④ done → waiting_agentic",
       "type": "timeseries",
-      "gridPos": { "h": 6, "w": 6, "x": 18, "y": 28 },
+      "gridPos": { "h": 5, "w": 6, "x": 18, "y": 28 },
       "datasource": { "type": "prometheus", "uid": "prometheus" },
       "targets": [
         {
           "expr": "increase(mcpguard_analysis_stage_transitions_total{from_stage=\"done\",to_stage=\"waiting_agentic\"}[1m])",
-          "legendFormat": "done → waiting_agentic"
+          "legendFormat": "done → waiting_agentic",
+          "interval": "1m"
         }
       ],
       "fieldConfig": {
         "defaults": {
           "unit": "short",
           "color": { "mode": "fixed", "fixedColor": "purple" },
-          "custom": { "drawStyle": "bars", "fillOpacity": 80, "lineWidth": 0 }
+          "custom": {
+            "drawStyle": "bars",
+            "fillOpacity": 80,
+            "lineWidth": 0,
+            "barAlignment": 0,
+            "spanNulls": false
+          }
         }
       },
-      "options": { "tooltip": { "mode": "single" } }
+      "options": { "tooltip": { "mode": "single" }, "legend": { "displayMode": "hidden" } }
     },
     {
-      "title": "Stage Duration by Stage",
+      "title": "Stage Duration p95 (by stage)",
       "type": "bargauge",
-      "gridPos": { "h": 6, "w": 12, "x": 0, "y": 34 },
+      "gridPos": { "h": 6, "w": 12, "x": 0, "y": 33 },
       "datasource": { "type": "prometheus", "uid": "prometheus" },
       "targets": [
         {
@@ -349,34 +353,25 @@
       }
     },
     {
-      "title": "Repository Clone Metrics",
+      "title": "Repository Clone (p95 / errors)",
       "type": "bargauge",
-      "gridPos": { "h": 6, "w": 8, "x": 0, "y": 34 },
+      "gridPos": { "h": 6, "w": 6, "x": 12, "y": 33 },
       "datasource": { "type": "prometheus", "uid": "prometheus" },
       "targets": [
         {
           "expr": "histogram_quantile(0.95, sum(increase(mcpguard_repo_clone_duration_seconds_bucket[$__range])) by (le))",
-          "legendFormat": "Clone Duration p95",
+          "legendFormat": "Clone p95 (s)",
           "instant": true
         },
         {
           "expr": "increase(mcpguard_repo_clone_errors_total[$__range])",
-          "legendFormat": "Clone Errors",
+          "legendFormat": "Clone errors",
           "instant": true
         }
       ],
       "fieldConfig": {
         "defaults": {
-          "unit": "s",
-          "color": { "mode": "palette-classic" },
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              { "value": 0, "color": "green" },
-              { "value": 5, "color": "yellow" },
-              { "value": 30, "color": "red" }
-            ]
-          }
+          "color": { "mode": "palette-classic" }
         }
       },
       "options": {
@@ -386,9 +381,38 @@
       }
     },
     {
-      "title": "Storage Operations",
+      "title": "Repository Size (p50 / p95)",
       "type": "bargauge",
-      "gridPos": { "h": 6, "w": 8, "x": 8, "y": 34 },
+      "gridPos": { "h": 6, "w": 6, "x": 18, "y": 33 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.50, sum(increase(mcpguard_repo_size_bytes_bucket[$__range])) by (le))",
+          "legendFormat": "p50",
+          "instant": true
+        },
+        {
+          "expr": "histogram_quantile(0.95, sum(increase(mcpguard_repo_size_bytes_bucket[$__range])) by (le))",
+          "legendFormat": "p95",
+          "instant": true
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bytes",
+          "color": { "mode": "palette-classic" }
+        }
+      },
+      "options": {
+        "orientation": "horizontal",
+        "displayMode": "gradient",
+        "reduceOptions": { "calcs": ["lastNotNull"] }
+      }
+    },
+    {
+      "title": "Storage Operations p95 (by type)",
+      "type": "bargauge",
+      "gridPos": { "h": 6, "w": 12, "x": 0, "y": 39 },
       "datasource": { "type": "prometheus", "uid": "prometheus" },
       "targets": [
         {
@@ -415,21 +439,28 @@
       }
     },
     {
-      "title": "Database Operations",
+      "title": "Storage Errors (by operation)",
       "type": "bargauge",
-      "gridPos": { "h": 6, "w": 8, "x": 16, "y": 34 },
+      "gridPos": { "h": 6, "w": 12, "x": 12, "y": 39 },
       "datasource": { "type": "prometheus", "uid": "prometheus" },
       "targets": [
         {
-          "expr": "histogram_quantile(0.95, sum(increase(mcpguard_database_operation_duration_seconds_bucket[$__range])) by (le, operation))",
-          "legendFormat": "{{operation}}",
+          "expr": "sum by (operation, file_type) (increase(mcpguard_storage_operation_errors_total[$__range]))",
+          "legendFormat": "{{operation}} {{file_type}}",
           "instant": true
         }
       ],
       "fieldConfig": {
         "defaults": {
-          "unit": "s",
-          "color": { "mode": "palette-classic" }
+          "unit": "short",
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "value": 0, "color": "green" },
+              { "value": 1, "color": "red" }
+            ]
+          }
         }
       },
       "options": {
@@ -441,13 +472,13 @@
     {
       "title": "🤖 Agentic Analysis",
       "type": "row",
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 40 },
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 45 },
       "collapsed": false
     },
     {
       "title": "Agentic Analysis Flow (1m buckets)",
       "type": "timeseries",
-      "gridPos": { "h": 6, "w": 12, "x": 0, "y": 41 },
+      "gridPos": { "h": 6, "w": 8, "x": 0, "y": 46 },
       "datasource": { "type": "prometheus", "uid": "prometheus" },
       "targets": [
         {
@@ -477,7 +508,7 @@
     {
       "title": "Agentic Analysis Duration (p50/p90/p99)",
       "type": "bargauge",
-      "gridPos": { "h": 6, "w": 12, "x": 12, "y": 41 },
+      "gridPos": { "h": 6, "w": 8, "x": 8, "y": 46 },
       "datasource": { "type": "prometheus", "uid": "prometheus" },
       "targets": [
         {
@@ -509,15 +540,46 @@
       }
     },
     {
+      "title": "Agentic Worker Errors (by type)",
+      "type": "bargauge",
+      "gridPos": { "h": 6, "w": 8, "x": 16, "y": 46 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "expr": "sum by (error_type) (increase(mcpguard_agentic_worker_errors_total[$__range]))",
+          "legendFormat": "{{error_type}}",
+          "instant": true
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "value": 0, "color": "green" },
+              { "value": 1, "color": "red" }
+            ]
+          }
+        }
+      },
+      "options": {
+        "orientation": "horizontal",
+        "displayMode": "gradient",
+        "reduceOptions": { "calcs": ["lastNotNull"] }
+      }
+    },
+    {
       "title": "📨 Queue Observability",
       "type": "row",
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 47 },
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 52 },
       "collapsed": false
     },
     {
       "title": "Messages Published (1m buckets)",
       "type": "timeseries",
-      "gridPos": { "h": 6, "w": 12, "x": 0, "y": 48 },
+      "gridPos": { "h": 6, "w": 12, "x": 0, "y": 53 },
       "datasource": { "type": "prometheus", "uid": "prometheus" },
       "targets": [
         {
@@ -541,7 +603,7 @@
     {
       "title": "Messages Consumed (1m buckets)",
       "type": "timeseries",
-      "gridPos": { "h": 6, "w": 12, "x": 12, "y": 48 },
+      "gridPos": { "h": 6, "w": 12, "x": 12, "y": 53 },
       "datasource": { "type": "prometheus", "uid": "prometheus" },
       "targets": [
         {
@@ -565,7 +627,7 @@
     {
       "title": "Queue Publish Duration (p95)",
       "type": "bargauge",
-      "gridPos": { "h": 6, "w": 12, "x": 0, "y": 54 },
+      "gridPos": { "h": 6, "w": 12, "x": 0, "y": 59 },
       "datasource": { "type": "prometheus", "uid": "prometheus" },
       "targets": [
         {
@@ -589,7 +651,7 @@
     {
       "title": "Publish vs Consume (total)",
       "type": "stat",
-      "gridPos": { "h": 6, "w": 12, "x": 12, "y": 54 },
+      "gridPos": { "h": 6, "w": 12, "x": 12, "y": 59 },
       "datasource": { "type": "prometheus", "uid": "prometheus" },
       "targets": [
         {
@@ -618,13 +680,13 @@
     {
       "title": "💻 Container Resources",
       "type": "row",
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 47 },
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 65 },
       "collapsed": false
     },
     {
       "title": "CPU % of Total (by service)",
       "type": "timeseries",
-      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 48 },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 66 },
       "datasource": { "type": "prometheus", "uid": "prometheus" },
       "targets": [
         {
@@ -645,7 +707,7 @@
     {
       "title": "RAM % of Total (by service)",
       "type": "timeseries",
-      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 48 },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 66 },
       "datasource": { "type": "prometheus", "uid": "prometheus" },
       "targets": [
         {
@@ -666,7 +728,7 @@
     {
       "title": "CPU % of Total — Current (by service)",
       "type": "bargauge",
-      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 56 },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 74 },
       "datasource": { "type": "prometheus", "uid": "prometheus" },
       "targets": [
         {
@@ -699,7 +761,7 @@
     {
       "title": "RAM % of Total — Current (by service)",
       "type": "bargauge",
-      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 56 },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 74 },
       "datasource": { "type": "prometheus", "uid": "prometheus" },
       "targets": [
         {
@@ -732,7 +794,7 @@
     {
       "title": "Disk I/O % of Total — Read (by service)",
       "type": "timeseries",
-      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 64 },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 82 },
       "datasource": { "type": "prometheus", "uid": "prometheus" },
       "targets": [
         {
@@ -752,7 +814,7 @@
     {
       "title": "Disk I/O % of Total — Write (by service)",
       "type": "timeseries",
-      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 64 },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 82 },
       "datasource": { "type": "prometheus", "uid": "prometheus" },
       "targets": [
         {
@@ -772,13 +834,13 @@
     {
       "title": "🖥️ Host System",
       "type": "row",
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 73 },
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 91 },
       "collapsed": false
     },
     {
       "title": "Host CPU Usage",
       "type": "timeseries",
-      "gridPos": { "h": 6, "w": 8, "x": 0, "y": 74 },
+      "gridPos": { "h": 6, "w": 8, "x": 0, "y": 92 },
       "datasource": { "type": "prometheus", "uid": "prometheus" },
       "targets": [
         {
@@ -805,7 +867,7 @@
     {
       "title": "Host Memory Usage",
       "type": "timeseries",
-      "gridPos": { "h": 6, "w": 8, "x": 8, "y": 74 },
+      "gridPos": { "h": 6, "w": 8, "x": 8, "y": 92 },
       "datasource": { "type": "prometheus", "uid": "prometheus" },
       "targets": [
         {
@@ -832,7 +894,7 @@
     {
       "title": "Host Disk Usage",
       "type": "gauge",
-      "gridPos": { "h": 6, "w": 8, "x": 16, "y": 74 },
+      "gridPos": { "h": 6, "w": 8, "x": 16, "y": 92 },
       "datasource": { "type": "prometheus", "uid": "prometheus" },
       "targets": [
         {

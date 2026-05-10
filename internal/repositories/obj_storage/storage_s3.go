@@ -5,7 +5,10 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
+	"time"
 
+	"github.com/FlppFer/MCPGuard/internal/metrics"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	awsconfig "github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/credentials"
@@ -72,29 +75,46 @@ func (s *S3Storage) UploadFile(ctx context.Context, key string, localPath string
 	}
 	defer f.Close()
 
-	uploader := manager.NewUploader(s.client)
+	fileType := filepath.Ext(key)
+	if fileType == "" {
+		fileType = "unknown"
+	}
 
+	uploader := manager.NewUploader(s.client)
+	start := time.Now()
 	_, err = uploader.Upload(ctx, &s3.PutObjectInput{
 		Bucket: aws.String(s.bucket),
 		Key:    aws.String(key),
 		Body:   f,
 	})
-	return err
+	if err != nil {
+		metrics.StorageOperationErrors.WithLabelValues("upload", fileType).Inc()
+		return err
+	}
+	metrics.StorageUploadDuration.WithLabelValues(fileType).Observe(time.Since(start).Seconds())
+	return nil
 }
 
 // DownloadFile downloads the object and returns its bytes.
 func (s *S3Storage) DownloadFile(ctx context.Context, key string) ([]byte, error) {
-	downloader := manager.NewDownloader(s.client)
+	fileType := filepath.Ext(key)
+	if fileType == "" {
+		fileType = "unknown"
+	}
 
+	downloader := manager.NewDownloader(s.client)
 	buf := manager.NewWriteAtBuffer([]byte{})
 
+	start := time.Now()
 	_, err := downloader.Download(ctx, buf, &s3.GetObjectInput{
 		Bucket: aws.String(s.bucket),
 		Key:    aws.String(key),
 	})
 	if err != nil {
+		metrics.StorageOperationErrors.WithLabelValues("download", fileType).Inc()
 		return nil, err
 	}
+	metrics.StorageDownloadDuration.WithLabelValues(fileType).Observe(time.Since(start).Seconds())
 	return buf.Bytes(), nil
 }
 

@@ -66,10 +66,7 @@ func (a *webhookAuthenticator) ValidateSignature(payload []byte, signature strin
 
 	valid := hmac.Equal(receivedMAC, expectedMAC)
 	if !valid {
-		slog.Warn("Webhook signature mismatch",
-			"received", hex.EncodeToString(receivedMAC),
-			"expected", hex.EncodeToString(expectedMAC),
-			"payload_len", len(payload))
+		slog.Warn("Webhook signature mismatch — check that GITHUB_WEBHOOK_SECRET matches the secret configured in GitHub")
 	}
 	return valid
 }

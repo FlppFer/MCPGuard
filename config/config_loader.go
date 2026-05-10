@@ -87,7 +87,35 @@ func readFileConfig(fileName string) (*Config, error) {
 		return nil, fmt.Errorf("ERROR - Failed to parse config file. %w", err)
 	}
 
+	applyEnvOverrides(cfg)
+
 	return cfg, nil
+}
+
+// applyEnvOverrides applies runtime environment variable overrides to the config
+// so infrastructure settings (e.g. RABBITMQ_URL) can be configured without
+// rebuilding images. Presence of RABBITMQ_URL implicitly enables messaging.
+func applyEnvOverrides(cfg *Config) {
+	if cfg == nil {
+		return
+	}
+	if url := os.Getenv("RABBITMQ_URL"); url != "" {
+		if cfg.MessagingCfg == nil {
+			cfg.MessagingCfg = &MessagingConfig{}
+		}
+		cfg.MessagingCfg.RabbitMQURL = url
+		cfg.MessagingCfg.Enabled = true
+		slog.Info("MCPGuard - Messaging enabled via RABBITMQ_URL env override")
+	}
+	if dsn := os.Getenv("DATABASE_URL"); dsn != "" {
+		if cfg.DbCfg == nil {
+			cfg.DbCfg = &DatabaseConfig{}
+		}
+		cfg.DbCfg.Provider = "postgres"
+		cfg.DbCfg.DSN = dsn
+		cfg.DbCfg.Mock = false
+		slog.Info("MCPGuard - Postgres enabled via DATABASE_URL env override")
+	}
 }
 
 func getScope() string {

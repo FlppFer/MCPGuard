@@ -2,7 +2,7 @@ package setup
 
 import (
 	"context"
-	"fmt"
+	"log/slog"
 	"os"
 
 	"github.com/FlppFer/MCPGuard/config"
@@ -94,8 +94,11 @@ func initPublisher(cfg *config.Config) messaging.MessagePublisher {
 	if cfg.MessagingCfg != nil && cfg.MessagingCfg.Enabled {
 		publisher, err := messaging.NewRabbitMQPublisher(cfg.MessagingCfg.RabbitMQURL)
 		if err != nil {
-			panic(fmt.Sprintf("failed to connect to RabbitMQ: %v", err))
+			slog.Warn("Failed to connect to RabbitMQ — falling back to local analysis mode",
+				"url", cfg.MessagingCfg.RabbitMQURL, "error", err)
+			return messaging.NewNoopPublisher()
 		}
+		slog.Info("Connected to RabbitMQ", "url", cfg.MessagingCfg.RabbitMQURL)
 		return publisher
 	}
 	return messaging.NewNoopPublisher()

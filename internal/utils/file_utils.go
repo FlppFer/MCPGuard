@@ -46,6 +46,22 @@ func ParseRepositoryFiles(path string) ([]services.SourceFileDTO, error) {
 	return files, err
 }
 
+// dirSize walks the given directory and returns the total size in bytes.
+// Symbolic links are not followed. Errors during traversal are returned.
+func dirSize(path string) (int64, error) {
+	var total int64
+	err := filepath.Walk(path, func(_ string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+		if !info.IsDir() {
+			total += info.Size()
+		}
+		return nil
+	})
+	return total, err
+}
+
 func zipFolder(srcFolder, destZip string) (retErr error) {
 	zipFile, err := os.Create(destZip)
 	if err != nil {

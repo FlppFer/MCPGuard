@@ -9,6 +9,7 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	amqp "github.com/rabbitmq/amqp091-go"
@@ -135,6 +136,15 @@ func (w *StaticAnalysisWorker) handleMessage(ctx context.Context, msg amqp.Deliv
 	slog.Info("Worker: processing analysis job", "analysis_id", job.AnalysisID)
 
 	if err := w.processJob(ctx, &job); err != nil {
+		// If the analysis entity is missing from the DB, the message is unrecoverable
+		// (e.g. stale job from a previous schema or dropped DB). Discard rather than
+		// requeue forever.
+		if strings.Contains(err.Error(), "record not found") {
+			slog.Warn("Worker: discarding unrecoverable job", "analysis_id", job.AnalysisID, "error", err)
+			msg.Nack(false, false)
+			metrics.QueueConsumeTotal.WithLabelValues(messaging.QueueStaticAnalysis, "discarded").Inc()
+			return
+		}
 		slog.Error("Worker: job failed, requeuing", "analysis_id", job.AnalysisID, "error", err)
 		msg.Nack(false, true) // requeue for retry
 		metrics.QueueConsumeTotal.WithLabelValues(messaging.QueueStaticAnalysis, "failure").Inc()

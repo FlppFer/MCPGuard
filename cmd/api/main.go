@@ -15,6 +15,7 @@ import (
 	"github.com/FlppFer/MCPGuard/config"
 	"github.com/FlppFer/MCPGuard/internal/service/static_analysis"
 	"github.com/FlppFer/MCPGuard/internal/worker"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 
 	_ "github.com/FlppFer/MCPGuard/internal/service/static_analysis/languages/python/rules"
 )
@@ -118,6 +119,26 @@ func runWorker(ctx context.Context, cfg *config.Config) error {
 
 	ctx, stop := signal.NotifyContext(ctx, os.Interrupt, syscall.SIGTERM)
 	defer stop()
+
+	// Expose /metrics so Prometheus can scrape the worker process.
+	mux := http.NewServeMux()
+	mux.Handle("/metrics", promhttp.Handler())
+	mux.HandleFunc("/health", func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`{"status":"ok"}`))
+	})
+	metricsSrv := &http.Server{Addr: ":8080", Handler: mux}
+	go func() {
+		slog.Info("Worker metrics server listening", "addr", ":8080")
+		if err := metricsSrv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			slog.Error("worker metrics server failed", "error", err)
+		}
+	}()
+	defer func() {
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+		defer cancel()
+		_ = metricsSrv.Shutdown(shutdownCtx)
+	}()
 
 	return w.Start(ctx)
 }

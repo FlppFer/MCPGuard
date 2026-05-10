@@ -22,6 +22,11 @@ func NewDatabaseClient(cfgClient *config.DatabaseConfig) (DatabaseClient, error)
 		return nil, fmt.Errorf("database configuration is nil")
 	}
 
+	// Postgres takes precedence — shared across API and worker instances.
+	if cfgClient.Provider == "postgres" {
+		return NewPostgresAnalysisRepository(cfgClient.DSN)
+	}
+
 	if cfgClient.Mock {
 		return NewLocalSQLiteAnalysisRepository()
 	}

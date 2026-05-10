@@ -43,8 +43,15 @@ type (
 	}
 
 	DatabaseConfig struct {
-		Mock bool   `yaml:"mock"`
+		// Provider selects the backend: "sqlite" (default) or "postgres".
+		Provider string `yaml:"provider"`
+		// Mock enables the ephemeral in-process SQLite DB — for unit tests only.
+		Mock bool `yaml:"mock"`
+		// Path is the SQLite file path (used when Provider=="sqlite").
 		Path string `yaml:"path"`
+		// DSN is the Postgres connection string (used when Provider=="postgres").
+		// Can be overridden at runtime by the DATABASE_URL env var.
+		DSN string `yaml:"dsn"`
 	}
 
 	// ObjectStorageConfig configures the storage backend.

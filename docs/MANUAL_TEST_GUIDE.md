@@ -14,7 +14,7 @@ Ensure `e:\dev\projetos\MCPGuard\.env` contains:
 ```env
 GITHUB_WEBHOOK_SECRET=your-webhook-secret-here
 MCPGUARD_API_KEYS=dev-client:dev-key
-GIT_AUTH_TOKEN=<your_github_pat>
+GITHUB_TOKEN=<your_github_pat>
 ```
 
 ### 2. Start Full Stack

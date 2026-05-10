@@ -85,11 +85,13 @@ func (s *agenticAnalysisServiceImpl) SubmitForAnalysis(ctx context.Context, req 
 
 	resp, err := s.httpClient.Do(httpReq)
 	if err != nil {
+		metrics.AgenticWorkerErrors.WithLabelValues("submit_http_error").Inc()
 		return fmt.Errorf("failed to submit to agentic worker: %w", err)
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode >= 400 {
+		metrics.AgenticWorkerErrors.WithLabelValues("submit_bad_status").Inc()
 		return fmt.Errorf("agentic worker returned status %d", resp.StatusCode)
 	}
 
@@ -102,17 +104,20 @@ func (s *agenticAnalysisServiceImpl) SubmitForAnalysis(ctx context.Context, req 
 func (s *agenticAnalysisServiceImpl) ReceiveResult(ctx context.Context, result *httpmodel.AgenticAnalysisResultDTO) error {
 	data, err := json.MarshalIndent(result, "", "  ")
 	if err != nil {
+		metrics.AgenticWorkerErrors.WithLabelValues("marshal").Inc()
 		return fmt.Errorf("failed to marshal agentic result: %w", err)
 	}
 
 	tmpFile := filepath.Join(os.TempDir(), fmt.Sprintf(TmpFileAgenticResult, result.AnalysisID))
 	if err := os.WriteFile(tmpFile, data, 0644); err != nil {
+		metrics.AgenticWorkerErrors.WithLabelValues("tmp_write").Inc()
 		return fmt.Errorf("failed to write temp file: %w", err)
 	}
 	defer os.Remove(tmpFile)
 
 	s3Key := fmt.Sprintf(S3KeyAgenticResult, result.AnalysisID)
 	if err := s.storageRepo.UploadFile(ctx, s3Key, tmpFile); err != nil {
+		metrics.AgenticWorkerErrors.WithLabelValues("upload").Inc()
 		return fmt.Errorf("failed to upload agentic result: %w", err)
 	}
 

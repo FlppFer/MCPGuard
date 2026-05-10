@@ -189,9 +189,9 @@
         "refresh": 2,
         "sort": 1,
         "includeAll": true,
-        "allValue": ".+",
+        "allValue": "mcpguard-api|mcpguard-worker|python-worker|rabbitmq|postgres|localstack",
         "multi": true,
-        "current": { "text": "All", "value": "$__all" }
+        "current": { "text": "App services", "value": "$__all" }
       },
       {
         "name": "level",

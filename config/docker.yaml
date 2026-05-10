@@ -2,6 +2,8 @@ scope: "docker"
 log-level: "info"
 
 data_base:
+  # Overridden at runtime by DATABASE_URL env var (docker-compose sets it to the
+  # local postgres service). Left as mock for safety if the env var is missing.
   mock: true
 
 object_storage:
