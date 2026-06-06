@@ -131,27 +131,29 @@ híbrido e orientado a serviços, combinando análise estática baseada em regra
 análise agêntica através de modelos de IA especializados em cibersegurança. O sistema
 é composto por quatro subsistemas principais: (1) API Principal em Go (Ingestão,
 Motor de Análise e Relatórios), (2) API de Análise Agêntica em Python, (3) Sistema de
-Filas para Escalabilidade, e (4) Integração com GitHub Actions — isolando nossas api's
-e componentes de infraestrutura em containers docker.
+Filas para Escalabilidade, e (4) Integração com o GitHub via webhooks e API REST —
+isolando nossas api's e componentes de infraestrutura em containers docker.
 
 
 Essa abordagem assegura alta performance através do Go para análise estática,
 flexibilidade do Python para integração com LLMs, escalabilidade horizontal via
-sistema de filas, e integração nativa com pipelines de CI/CD através de GitHub Actions.
+sistema de filas, e integração nativa com o fluxo de desenvolvimento através de
+webhooks do GitHub (eventos de Pull Request) e da API REST do GitHub (publicação
+de comentários).
 
 O fluxo operacional inicia quando um pull request é aberto, enviando uma request
 HTTP para a API Principal via webhook do GitHub. A API cria um job de análise,
 persiste os metadados no banco de dados relacional (PostgreSQL em ambiente
 containerizado, SQLite em execução local), e publica a tarefa na fila
-`static-analysis` do RabbitMQ, consumida por um worker Go. O Motor de Análise
+`mcpguard.static_analysis` do RabbitMQ, consumida por um worker Go. O Motor de Análise
 Estática aplica 31 regras de segurança baseadas na taxonomia de ataques MCPLib
 (arXiv:2508.12538). Ao final da análise estática, o worker invoca diretamente a
 API Python agêntica via HTTP (`POST /analyze`, resposta `202 Accepted`), que
-executa um agente de IA baseado no Google Gemini 2.5 Flash para análise
+executa um agente de IA baseado no Google Gemini (`gemini-2.5-pro`) para análise
 semântica; a API Python retorna os resultados à API Go através de um endpoint de
 *callback* HTTP autenticado. Os resultados são armazenados em um serviço de
 armazenamento compatível com S3, disponibilizados através da API REST, e
-enviados como comentários em Pull Requests via GitHub Actions.
+enviados como comentários em Pull Requests através da API REST do GitHub.
 
 As regras de segurança implementadas são baseadas na taxonomia de ataques MCP
 proposta por Guo et al. (2025), cobrindo 31 tipos de ataques organizados em 4
@@ -172,8 +174,8 @@ dois modos de autenticação: verificação de assinatura HMAC-SHA256 para webho
 do GitHub (header X-Hub-Signature-256) e autenticação por API Key para acesso
 direto (headers X-API-Key e X-Client-ID). O Motor de Análise Estática utiliza a
 biblioteca tree-sitter para parsing de código-fonte, aplicando 31 regras de segurança
-organizadas em 11 arquivos, conforme a taxonomia de ataques MCP proposta por Guo
-et al. (2025). O Módulo de Relatórios organiza as descobertas em relatórios JSON com
+organizadas em 11 arquivos por linguagem (Python e JavaScript), conforme a taxonomia
+de ataques MCP proposta por Guo et al. (2025). O Módulo de Relatórios organiza as descobertas em relatórios JSON com
 severidade (LOW, MEDIUM, HIGH, CRITICAL), localização no código e
 recomendações de mitigação.
 
@@ -215,8 +217,8 @@ API Theft |
 ```
 b) API de Análise Agêntica (Python): O segundo componente é uma API separada
 desenvolvida em Python com FastAPI e Uvicorn, responsável por executar análises
-de segurança através de um agente de IA baseado em LLM (Google Gemini 2.5
-Flash). Este agente utiliza prompts especializados em cibersegurança MCP para
+de segurança através de um agente de IA baseado em LLM (Google Gemini,
+`gemini-2.5-pro`). Este agente utiliza prompts especializados em cibersegurança MCP para
 realizar análise semântica profunda do código, identificando vulnerabilidades
 complexas que escapam às regras estáticas. A integração com a API Principal é
 feita via HTTP REST: a API Go envia um `POST /analyze` e recebe `202 Accepted`;
@@ -231,15 +233,16 @@ broker entre a API Principal (Go) e o worker de análise estática (Go). A escol
 do RabbitMQ se justifica por ser um serviço dedicado de filas de mensagens,
 oferecendo recursos avançados como roteamento flexível, confirmação de entrega
 (`ack`/`nack`) e persistência de mensagens. A API Principal enfileira jobs de
-análise na fila `static-analysis`, que são consumidos por workers, permitindo
+análise na fila `mcpguard.static_analysis`, que são consumidos por workers, permitindo
 processar múltiplas análises simultaneamente sem bloquear o servidor principal.
 Esta abordagem também proporciona resiliência a falhas e permite escalar
 workers independentemente conforme a demanda. A comunicação com a API agêntica
 Python, por sua vez, é feita via REST + *callback* HTTP, e não por fila.
 
-d) Integração CI/CD e Métricas: A integração com pipelines de desenvolvimento é
-realizada através de GitHub Actions, que automatizam a análise de segurança em cada
-Pull Request. Quando vulnerabilidades são detectadas, comentários são
+d) Integração CI/CD e Métricas: A integração com o fluxo de desenvolvimento é
+realizada por meio de **webhooks do GitHub**: cada Pull Request dispara um evento
+(autenticado por HMAC-SHA256) para a API, que executa a análise. Quando
+vulnerabilidades são detectadas, comentários são
 
 
 automaticamente inseridos no PR com detalhes das descobertas e recomendações. Para
@@ -272,7 +275,7 @@ de ambiente `MODE`, evitando duplicação de código e simplificando o *deploy*.
 b) API de Análise Agêntica (Python)
 
 A API Python é responsável pela análise de segurança avançada utilizando um
-agente de IA baseado no Google Gemini 2.5 Flash. Construída sobre FastAPI +
+agente de IA baseado no Google Gemini (`gemini-2.5-pro`). Construída sobre FastAPI +
 Uvicorn + Pydantic v2, expõe o endpoint `POST /analyze` que aceita um job e o
 processa de forma assíncrona via `BackgroundTasks` do FastAPI, respondendo
 imediatamente com `202 Accepted`. Internamente, baixa o artefato do armazenamento
@@ -289,7 +292,7 @@ c) Sistema de Filas (RabbitMQ)
 O sistema de filas é implementado com RabbitMQ, um message broker open source
 que implementa o protocolo AMQP (Advanced Message Queuing Protocol). Ao receber
 uma solicitação de análise, a API Principal responde imediatamente ao cliente
-com o ID da análise e publica a tarefa na fila `static-analysis`. O worker Go
+com o ID da análise e publica a tarefa na fila `mcpguard.static_analysis`. O worker Go
 consome as mensagens e executa a análise estática. A invocação da API agêntica
 Python ocorre **depois** desse estágio, via HTTP REST síncrono com retorno
 assíncrono por *callback*, sem envolver o broker. Isso permite:
@@ -328,12 +331,14 @@ referências aos resultados. O armazenamento de objetos compatível com S3 (AWS
 S3 ou LocalStack em desenvolvimento) persiste os relatórios JSON gerados e os
 artefatos de código compactados (ZIPs do repositório).
 
-f) Integração CI/CD (GitHub Actions)
+f) Integração CI/CD (Webhooks + API REST do GitHub)
 
-A integração com pipelines de CI/CD é realizada através de GitHub Actions. O
-workflow automatiza a análise de segurança em cada Pull Request, inserindo
-comentários automáticos com as vulnerabilidades detectadas. A autenticação utiliza
-webhooks com assinatura HMAC-SHA256.
+A integração com o fluxo de desenvolvimento é feita por **webhooks do GitHub**
+(e não por GitHub Actions): cada evento de Pull Request é enviado ao endpoint
+`/v1/webhook/github` com assinatura HMAC-SHA256, disparando a análise. Os
+comentários com as vulnerabilidades detectadas são publicados de volta no PR
+através da **API REST do GitHub** (`POST /repos/{owner}/{repo}/issues/{n}/comments`),
+autenticada por um *token* do GitHub.
 
 g) Sistema de Métricas e Observabilidade
 
@@ -476,7 +481,7 @@ expor o endpoint
 jobs via `BackgroundTasks`.
 ```
 
-Google Gemini 2.5 Flash API Agêntica / Análise
+Google Gemini (gemini-2.5-pro) API Agêntica / Análise
 Semântica (LLM)
 
 ```
@@ -538,18 +543,17 @@ vulnerabilidades
 específicas do MCP com
 alta precisão.
 ```
-GitHub Actions DevOps / Integração
+GitHub REST API DevOps / Integração
 Contínua
 
 ```
-Workflows automatizados
-que executam análise de
-segurança em cada PR e
-inserem comentários com
-vulnerabilidades
-detectadas. Integração
-nativa com repositórios
-GitHub.
+API REST do GitHub usada
+para publicar comentários
+com as vulnerabilidades
+detectadas no Pull Request
+e listar os arquivos
+alterados. Autenticada por
+*token* do GitHub.
 ```
 GitHub Webhooks DevOps / Integração
 Contínua
@@ -618,10 +622,14 @@ expõe métricas do host
 (disco, rede, load).
 ```
 ```
-TLS (HTTPS) Segurança / Comunicação Garante a proteção dos
-dados em trânsito entre
-clientes, API e serviços de
-armazenamento.
+TLS (HTTPS) Segurança / Comunicação Protege os dados em
+trânsito. No estágio atual,
+a API Go escuta em HTTP
+(`:8080`); o *offload* de
+TLS é previsto na camada
+de *reverse proxy* /
+*ingress* em produção, não
+na aplicação.
 ```
 ## 4. Resultados e Discussões
 
@@ -660,10 +668,13 @@ automaticamente como comentário no Pull Request correspondente via GitHub API.
 estáticos, ordenados por severidade, contendo regra, arquivo:linha e descrição.*
 
 **Discussão:** A cobertura de 31 regras representa mapeamento completo da taxonomia
-MCPLib. O uso de AST via tree-sitter elimina falsos positivos causados por análise
-textual superficial — por exemplo, distinguindo chamadas a `eval()` legítimas de usos
-maliciosos com base no contexto sintático. A publicação automática no PR fecha o loop
-de feedback para o desenvolvedor sem exigir acesso a ferramentas externas.
+MCPLib. O motor adota uma abordagem **híbrida**: o tree-sitter gera a AST e o worker
+percorre seus nós, aplicando padrões (em sua maioria expressões regulares) ao conteúdo
+de nós relevantes — *strings*, comentários e chamadas. Ao escopar a correspondência à
+estrutura sintática, em vez de varrer o texto bruto do arquivo inteiro, essa estratégia
+**reduz** os falsos positivos típicos de análise puramente textual, ainda que não os
+elimine por completo. A publicação automática no PR fecha o loop de feedback para o
+desenvolvedor sem exigir acesso a ferramentas externas.
 
 ---
 
@@ -672,12 +683,20 @@ de feedback para o desenvolvedor sem exigir acesso a ferramentas externas.
 A integração com GitHub foi implementada em dois sentidos:
 
 - **Entrada:** o sistema recebe eventos `pull_request` (opened, synchronize, reopened)
-  via webhook autenticado com HMAC-SHA256. Ao receber o evento, a API extrai
-  repositório, branch, commit e número do PR, cria um job de análise com UUID e o
-  enfileira no RabbitMQ.
+  via webhook autenticado com HMAC-SHA256, apontado para o endpoint de análise
+  inicial `/v1/webhook/github`. Ao receber o evento, a API extrai repositório,
+  branch, commit e número do PR, cria um job de análise com UUID e o enfileira
+  no RabbitMQ.
 - **Saída:** após a conclusão da análise estática e agêntica, dois comentários são
   publicados automaticamente no PR — um com os achados estáticos ordenados por
   severidade e outro com os achados semânticos da análise agêntica.
+
+Todo o fluxo automático — tendo como *trigger* um Pull Request em um repositório
+devidamente configurado — funciona ponta a ponta e é assegurado por autenticação,
+gerando tanto o comentário da análise estática quanto o da análise agêntica. O
+comportamento pode ser verificado diretamente no PR aberto no repositório público
+de testes do sistema:
+<https://github.com/FlppFer/vulnerable_mcp_server/pull/6>.
 
 **Figura B** — *Log da API mostrando o recebimento do webhook com campos `repo`,
 `pr`, `branch` e `action`.*
@@ -696,7 +715,7 @@ prevenindo abuso da API.
 ### 4.3. Sistema de Filas (RabbitMQ) e Worker Assíncrono
 
 O sistema de filas foi implementado com RabbitMQ. A API Principal publica jobs na fila
-`static-analysis` e retorna imediatamente ao GitHub (HTTP 202 Accepted), evitando
+`mcpguard.static_analysis` e retorna imediatamente ao GitHub (HTTP 202 Accepted), evitando
 timeout do webhook (limite de 10 segundos do GitHub). Um worker Go consome as
 mensagens, executa a análise estática em pipeline de estágios (download → parsing →
 análise → upload), e aciona a análise agêntica de forma encadeada.
@@ -709,17 +728,27 @@ em caso de reinicialização dos containers.
 e "Analyses per Hour" com jobs processados após ciclo de análise.*
 
 **Discussão:** Em execuções realizadas, o tempo médio desde o recebimento do webhook
-até a publicação do comentário estático foi de 30 a 60 segundos, dominado pelo tempo
-de clone do repositório via git. A arquitetura de filas permite escalar workers
-horizontalmente de forma independente da API principal, o que é relevante para
-cenários com múltiplos repositórios analisados simultaneamente.
+até a publicação do comentário estático foi de aproximadamente 5 segundos, e o
+*retry* automático (nack + requeue) garante resiliência contra falhas transitórias.
+A arquitetura de filas permite escalar workers horizontalmente de forma independente
+da API principal.
+
+Contudo, é preciso registrar uma avaliação crítica: para o escopo atual do projeto,
+o RabbitMQ representou um *overkill* arquitetônico. A não ser que políticas reais de
+implantação exijam garantia extrema de entrega da análise, o mesmo fluxo poderia ser
+orquestrado por uma ferramenta de automação mais simples — como o **n8n** — para
+receber a requisição do webhook do GitHub e coordenar as chamadas e respostas entre
+as duas APIs envolvidas, reduzindo a complexidade operacional sem perda funcional
+perceptível neste estágio. A escolha pelo RabbitMQ se justifica como demonstração de
+uma arquitetura preparada para escala, mas não como requisito do MVP.
 
 ---
 
 ### 4.4. Análise Agêntica (Python Worker + Gemini)
 
 A API Python implementa um pipeline de análise semântica baseado em LLM (Google
-Gemini 2.5 Flash). O worker executa as seguintes etapas:
+Gemini, modelo `gemini-2.5-pro` na cota gratuita do Google AI Studio). O worker
+executa as seguintes etapas:
 
 1. Recebe o job via HTTP POST da API Go, incluindo os achados estáticos como contexto.
 2. Baixa o arquivo ZIP do repositório do armazenamento S3-compatível.
@@ -731,11 +760,26 @@ Gemini 2.5 Flash). O worker executa as seguintes etapas:
 **Figura E** — *Comentário agêntico no PR mostrando findings com categoria,
 confiança (%), arquivo, linhas e sugestão de correção.*
 
-**Discussão:** A injeção dos achados estáticos no prompt do LLM permite que o modelo
-aprofunde sua análise nas vulnerabilidades já sinalizadas, reduzindo o risco de falsos
-negativos nas ocorrências mais críticas. O escopo reduzido ao conjunto de arquivos
-modificados no PR (em vez do repositório inteiro) diminui latência e custo de tokens,
-além de tornar o feedback mais preciso e relevante para a mudança em revisão.
+**Discussão:** Em termos de projeto, a injeção dos achados estáticos no prompt e o
+escopo reduzido ao *diff* do PR (em vez do repositório inteiro) são decisões corretas:
+diminuem latência e custo de tokens e tornam o feedback mais relevante à mudança em
+revisão. Na prática, porém, os resultados da análise agêntica ficaram **aquém do
+esperado**. A análise é hoje realizada por meio de uma chamada à API de
+desenvolvimento do Google AI Studio usando um modelo gratuito (`gemini-2.5-pro`),
+que se mostrou ineficiente mesmo recebendo os achados estáticos como contexto —
+principalmente quando limitado pela cota de *output* de tokens do plano gratuito.
+Nesse cenário, o modelo falha em identificar de forma consistente as vulnerabilidades
+introduzidas no arquivo novo do PR.
+
+A ideia inicial era treinar localmente um modelo de LLM gratuito e especializá-lo no
+domínio de segurança, mas, dado o poder de processamento disponível e os custos
+envolvidos, essa frente não se mostrou viável. Assim, a API secundária em Python é,
+hoje, essencialmente um *wrapper* que invoca uma versão gratuita do Gemini com um
+*prompt* interno para tentar identificar problemas de segurança. O simples uso de um
+plano pago, sem limitação de *input*/*output* de tokens, já geraria resultados
+significativamente mais efetivos; tais testes, entretanto, não puderam ser realizados
+por restrições financeiras. Trata-se, portanto, de uma limitação de recursos — e não
+de arquitetura: a estrutura de integração está pronta para um modelo mais capaz.
 
 ---
 
@@ -785,123 +829,119 @@ correlacionar um `analysis_id` específico nos logs de todos os serviços envolv
 | Correlação com taxonomia MCP (C) | ✅ Implementado | Mapeamento 1:1 com MCPLib |
 | Relatórios automáticos com severidade (D) | ✅ Implementado | JSON + comentário PR |
 | Integração CI/CD (E) | ✅ Implementado | GitHub webhook → RabbitMQ → worker |
-| Análise agêntica semântica | ✅ Implementado | Gemini, contexto estático, escopo PR |
+| Análise agêntica semântica | ⚠️ Implementado, eficácia limitada | Gemini gratuito; resultados aquém do esperado por limites de token |
 | Observabilidade e métricas | ✅ Implementado | Prometheus, Grafana, Loki/Promtail |
 
-## 5. Conclusões
+## 5. Considerações Finais
 
 A implementação do MCPGuard demonstra a viabilidade de construir uma pipeline
 automatizada de análise de segurança especializada no Model Context Protocol,
 cobrindo lacunas que ferramentas genéricas (SonarQube, Bandit, Snyk) não
 endereçam. Os principais achados do trabalho são:
 
-1. **Cobertura completa da taxonomia MCPLib** — as quatro categorias de
-   ataques descritas por Guo et al. (2025) foram mapeadas em 31 regras
-   estáticas, aplicadas sobre ASTs geradas por tree-sitter em duas linguagens
-   alvo (Python e JavaScript). A análise estrutural elimina falsos positivos
-   típicos de abordagens textuais (regex), distinguindo, por exemplo, usos
-   legítimos de `eval()` de padrões maliciosos contextuais.
+a) **Cobertura da taxonomia MCP atingida** — todas as quatro categorias do
+   MCPLib (Guo et al., 2025) foram mapeadas em regras estáticas, em duas
+   linguagens (Python e JavaScript), validando a viabilidade de aplicar
+   AST + tree-sitter para detecção precoce de vetores específicos do MCP.
+   O motor combina tree-sitter (AST) com padrões regex aplicados sobre os
+   nós relevantes, abordagem híbrida que **reduz** — sem eliminar por
+   completo — os falsos positivos típicos de análise puramente textual.
 
-2. **Arquitetura híbrida eficaz** — a separação entre análise determinística
-   (Go + AST) e análise semântica (Python + Gemini 2.5 Flash) provou-se
-   produtiva: a análise estática roda em segundos via RabbitMQ e fornece
-   feedback imediato no Pull Request; a análise agêntica, invocada via REST
-   com retorno por *callback*, complementa de forma assíncrona reaproveitando
-   os achados estáticos como contexto no prompt, reduzindo falsos negativos e
-   custo em tokens.
+b) **Arquitetura híbrida funcional** — a separação entre análise
+   determinística (Go/AST) e análise semântica (Python/LLM) provou-se eficaz:
+   a estática roda em segundos, com o worker Go consumindo os jobs publicados
+   na fila RabbitMQ; a agêntica complementa de forma assíncrona, reaproveitando
+   os achados estáticos como contexto e reduzindo falsos negativos e custo de
+   tokens. Vale esclarecer que a fila é usada apenas internamente, entre a API
+   Go e seu worker — a comunicação entre as **duas APIs distintas** (Go e
+   Python) é feita por HTTP (`POST /analyze`) com retorno por *callback*
+   autenticado, e não pelo sistema de filas. Na prática, contudo, a camada
+   agêntica entregou resultados aquém do esperado: operando com um modelo
+   gratuito (`gemini-2.5-pro`) e limitada pela cota de tokens do plano
+   gratuito, falha em identificar de forma consistente as vulnerabilidades do
+   *diff* em revisão. A limitação é de recursos, não de projeto — a integração
+   está pronta para um modelo mais capaz.
 
-3. **Integração nativa com o fluxo de desenvolvimento** — o ciclo
-   *Pull Request → webhook HMAC-SHA256 → fila → análise → comentário no PR*
-   foi entregue ponta a ponta, fechando o *loop* de feedback ao desenvolvedor
-   sem exigir acesso a ferramentas externas e respeitando o limite de 10
+c) **Integração CI/CD nativa** — o ciclo *PR → webhook HMAC → fila → análise
+   → comentário* foi entregue ponta a ponta, fechando o *loop* de feedback ao
+   desenvolvedor sem ferramentas externas e respeitando o limite de 10
    segundos do webhook do GitHub através do padrão *fire-and-forget* com
-   `202 Accepted`.
+   `202 Accepted`. Em testes com o repositório sintético `vulnerable_mcp_server`,
+   o tempo médio do webhook até a publicação do comentário estático foi de
+   aproximadamente 5 segundos.
 
-4. **Observabilidade de grau produtivo** — a stack Prometheus + Grafana +
-   Loki + Promtail, complementada por cAdvisor e node-exporter, permite
-   rastrear desde métricas de negócio (achados por severidade, análises por
-   hora, duração por estágio da pipeline) até métricas de infraestrutura
-   (uso de CPU/memória por contêiner), com correlação por `analysis_id`
-   entre métricas e logs estruturados.
+d) **Observabilidade de produção** — a stack Prometheus + Grafana + Loki +
+   Promtail, complementada por cAdvisor e node-exporter, dá visibilidade por
+   serviço, por estágio da pipeline (`downloading → parsing → static_analysis
+   → done → waiting_agentic`) e por `analysis_id`, permitindo diagnóstico fino
+   de gargalos e correlação entre métricas e logs estruturados.
 
-5. **Resiliência e escalabilidade** — o uso de RabbitMQ com `ack`/`nack`
-   protege contra falhas transitórias, a persistência de mensagens garante
-   que jobs não sejam perdidos em reinicializações, e o desacoplamento entre
-   API e worker permite escalar cada componente independentemente conforme
-   a demanda.
-
-Em termos quantitativos, em testes com o repositório sintético
-`vulnerable_mcp_server` o tempo médio desde o recebimento do webhook até a
-publicação do comentário de análise estática foi de 30 a 60 segundos,
-dominado pelo clone do repositório. A análise agêntica adiciona latência
-proporcional ao número de arquivos modificados no PR, mas mantém o custo de
-tokens controlado ao escopar a análise apenas ao *diff*.
+Cabe ainda uma reflexão arquitetônica honesta: para o escopo de um MVP, o
+uso de RabbitMQ representou um *overkill*. Salvo requisitos reais de garantia
+extrema de entrega, o mesmo fluxo poderia ser orquestrado por uma ferramenta
+de automação mais leve (por exemplo, n8n), coordenando o webhook e as chamadas
+entre as duas APIs com complexidade operacional bem menor. O RabbitMQ
+permanece justificável como demonstração de uma arquitetura preparada para
+escala horizontal.
 
 ## 6. Trabalhos Futuros
 
-Embora o projeto tenha atingido todos os objetivos propostos, diversas
-frentes de evolução foram identificadas:
+Embora o projeto tenha atingido seus objetivos centrais, diversas frentes de
+evolução foram identificadas:
 
-1. **Expansão linguística** — estender o motor estático a **TypeScript**,
-   **Go**, **Rust** e **Java**, linguagens comuns em servidores MCP de
-   produção. A arquitetura baseada em registro de regras já suporta essa
-   extensão sem modificação do núcleo.
+a) **Expansão linguística** — adicionar regras tree-sitter para **TypeScript**,
+   **Go**, **Rust** e **Java**, alinhando o motor com servidores MCP escritos
+   nessas linguagens. A arquitetura baseada em registro de regras já suporta
+   essa extensão sem modificação do núcleo.
 
-2. **Análise de fluxo de dados (*taint analysis*)** — atualmente as regras
-   são em sua maioria locais à AST. Um motor de *taint tracking*
-   interprocedural rastrearia dados controlados pelo usuário até *sinks*
-   perigosos (RCE, SQL Injection, Command Injection), reduzindo falsos
-   positivos e capturando vulnerabilidades inter-arquivos.
+b) **Análise de fluxo de dados (*taint analysis*)** — atualmente as regras são
+   em sua maioria locais à AST. Um *taint engine* permitiria rastrear dados
+   controlados pelo usuário até *sinks* perigosos, reduzindo falsos positivos
+   em RCE e *Command Injection* e capturando vulnerabilidades inter-arquivos.
 
-3. **Abstração multi-LLM** — desacoplar o `analyzer.py` do Gemini,
-   suportando OpenAI, Anthropic, Azure OpenAI e modelos *self-hosted*
-   (Ollama, vLLM), permitindo execução *air-gapped* e evitando
-   *vendor lock-in*.
+c) **Multi-LLM e modelos *self-hosted*** — abstrair o `analyzer.py` para
+   suportar OpenAI, Anthropic, Azure OpenAI e modelos locais (Ollama, vLLM),
+   evitando *vendor lock-in* com o Gemini e habilitando análise *air-gapped*.
 
-4. **Python worker como consumidor de fila** — migrar a integração Go↔Python
-   de REST + *callback* para consumo direto do RabbitMQ via `aio-pika`,
-   proporcionando *backpressure* natural, retry/requeue nativo do AMQP e
-   escalabilidade horizontal sem necessidade de *load balancer* HTTP.
-
-5. **Cache semântico de findings** — armazenar *embeddings* dos arquivos
+d) **Cache semântico de findings** — armazenar *embeddings* dos arquivos
    analisados e reutilizar resultados quando o *diff* entre revisões for
-   semanticamente irrelevante, reduzindo custo da análise agêntica em PRs
-   incrementais de grandes repositórios.
+   semanticamente irrelevante, reduzindo o custo da análise agêntica em PRs
+   incrementais.
 
-6. **Sandbox dinâmico (DAST)** — complementar a análise estática com
-   execução do servidor MCP em contêineres efêmeros para observar
-   comportamento em tempo de execução (chamadas de sistema, tráfego de
-   rede, *sandbox escape*), categoria já prevista na taxonomia MCPLib.
+e) **Suporte a runtime MCP (DAST)** — complementar a análise estática com um
+   *sandbox* dinâmico (a categoria *sandbox_escape* já consta na taxonomia)
+   que execute o servidor MCP em contêiner efêmero e observe chamadas reais
+   de ferramentas.
 
-7. **Exportação SARIF 2.1.0** — gerar relatórios no padrão SARIF para
-   integração nativa com GitHub Code Scanning, GitLab Security Dashboard e
-   SonarQube, ampliando o alcance da ferramenta.
+f) **Severidade adaptativa e SARIF** — exportar *findings* no padrão
+   SARIF 2.1.0 para integração com GitHub Code Scanning, GitLab e SonarQube,
+   e calibrar a severidade com um *feedback loop* da triagem dos
+   desenvolvedores.
 
-8. **Regras como dados (DSL declarativa)** — extrair as regras de Go para
-   uma DSL (estilo Semgrep/Rego), permitindo que a comunidade contribua com
-   novas regras sem recompilar o binário e acelerando a resposta a novas
-   vulnerabilidades publicadas.
+g) **Regras como dados (DSL)** — extrair as 31+ regras de Go para uma DSL
+   declarativa (estilo YAML/Rego/Semgrep), permitindo que a comunidade
+   contribua com novas regras sem recompilar o binário.
 
-9. **Agente *tool-using*** — evoluir o worker Python para um agente
-   multi-etapa capaz de consultar bases de CVE, repositórios de ataques MCP
-   conhecidos (MCPLib *live*) e realizar *grounding* dos achados, em vez de
-   uma única chamada `generateContent`.
+h) **Cobertura de identidade e permissões em tempo de instalação** — validar
+   `mcp.json`, escopos OAuth e *consent screens* (relacionado a
+   *Installer Spoofing* e *Privilege Escalation*).
 
-10. **Avaliação empírica rigorosa** — montar um *benchmark* público com
-    corpus rotulado de servidores MCP vulneráveis e medir *precision* e
-    *recall* do MCPGuard comparativamente a ferramentas genéricas
-    (Bandit, Semgrep, CodeQL), fornecendo evidência quantitativa para a
-    justificativa do projeto.
+i) **Agente multietapa com ferramentas** — evoluir o worker Python para um
+   agente *tool-using* (busca em bases de CVE, consulta ao MCPLib *live*), em
+   vez de uma única chamada `generateContent`.
 
-11. **Hardening da própria ferramenta** — migrar de *Personal Access Tokens*
-    para autenticação via GitHub App, aplicar *rate limiting* nos webhooks
-    e revisar a superfície de ataque do clone de repositórios arbitrários
-    (já parcialmente mitigada pelo isolamento em Docker).
+j) **Avaliação empírica** — montar um *benchmark* público (corpus rotulado de
+   servidores MCP vulneráveis) e medir *precision*/*recall* contra ferramentas
+   genéricas (Bandit, Semgrep, CodeQL), sustentando a justificativa do projeto
+   com dados.
 
-12. **Análise de configuração e instalação** — validar `mcp.json`, escopos
-    OAuth e *consent screens* (relacionado a *Installer Spoofing* e
-    *Privilege Escalation*), categorias da taxonomia ainda cobertas apenas
-    parcialmente pelo motor atual.
+k) **Hardening do próprio MCPGuard** — revisar a superfície de ataque do clone
+   de repositórios (já mitigada por Docker), aplicar *rate limiting* nos
+   webhooks e segregar as credenciais do GitHub via GitHub App em vez de PAT.
+
+l) **Migração de SQLite/Postgres para *event sourcing*** — habilitar auditoria
+   histórica de *findings* e *trend analysis* por repositório ao longo do
+   tempo.
 
 ## Referências
 
@@ -916,7 +956,9 @@ tools", https://tree-sitter.github.io/tree-sitter/.
 
 Docker Inc. (2024) "Docker Documentation", https://docs.docker.com/.
 
-GitHub (2024) "GitHub Actions Documentation", https://docs.github.com/en/actions.
+GitHub (2024) "GitHub REST API Documentation", https://docs.github.com/en/rest.
+
+GitHub (2024) "Webhooks Documentation", https://docs.github.com/en/webhooks.
 
 Grafana Labs (2024) "Grafana Documentation",
 https://grafana.com/docs/grafana/latest/.
